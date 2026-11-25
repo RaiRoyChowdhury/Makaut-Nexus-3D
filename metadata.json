@@ -1,0 +1,6 @@
+{
+  "name": "MAKAUT NEXUS 3D",
+  "description": "Futuristic 3D gamified academic OS and placement command center for MAKAUT B.Tech IT students.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

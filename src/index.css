@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --color-obsidian: #06080E;
+  --color-surface: #0D111A;
+  --color-surface-raised: #141926;
+  --color-teal-accent: #00F5D4;
+  --color-violet-accent: #8B5CF6;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+    background-color: #06080E;
+    color: #F4F7FB;
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+  }
+
+  /* Custom subtle dark scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #06080E;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.22);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 245, 212, 0.45);
+  }
+}
+
+.nexus-panel {
+  background: rgba(13, 17, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+}
+
+.nexus-panel-solid {
+  background: #0D111A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
