@@ -1,6 +1,10 @@
-import { useState } from "react";
-import { CheckCircle2, Send, Shield, ShieldAlert, Sparkles } from "lucide-react";
-import { evaluateInterviewAnswer, InterviewEvalResult } from "../../services/aiService";
+import { useRef, useState } from "react";
+import { CheckCircle2, RefreshCw, Send, Shield, ShieldAlert, Sparkles } from "lucide-react";
+import {
+  evaluateInterviewAnswer,
+  generateInterviewQuestion,
+  InterviewEvalResult,
+} from "../../services/aiService";
 import { useNexus } from "../../store/useNexusStore";
 
 interface BossShield {
@@ -65,13 +69,54 @@ const SHIELDS: BossShield[] = [
 
 export function InterviewBossDuel() {
   const { progress, recordInterviewShield } = useNexus();
+  const [shieldsState, setShieldsState] = useState<BossShield[]>(SHIELDS);
   const [activeShieldIdx, setActiveShieldIdx] = useState(0);
   const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
+  const [generatingQuestion, setGeneratingQuestion] = useState(false);
+  const [questionSources, setQuestionSources] = useState<Record<number, "default" | "gemini" | "local">>({});
   const [result, setResult] = useState<InterviewEvalResult | null>(null);
+  const seenQuestionsRef = useRef<Record<number, string[]>>({
+    1: [SHIELDS[0].question],
+    2: [SHIELDS[1].question],
+    3: [SHIELDS[2].question],
+  });
 
-  const shield = SHIELDS[activeShieldIdx];
+  const shield = shieldsState[activeShieldIdx];
   const clearedIds = progress.interviewShieldsCleared;
+
+  const handleNewQuestion = async () => {
+    if (generatingQuestion || loading) return;
+    setGeneratingQuestion(true);
+    try {
+      const prevList = seenQuestionsRef.current[shield.id] ?? [shield.question];
+      const fresh = await generateInterviewQuestion({
+        shieldId: shield.id,
+        stage: shield.stage,
+        difficulty: shield.difficulty,
+        previousQuestions: prevList,
+      });
+
+      seenQuestionsRef.current[shield.id] = [...prevList, fresh.question].slice(-12);
+      setShieldsState((prev) =>
+        prev.map((s) =>
+          s.id === shield.id
+            ? {
+                ...s,
+                question: fresh.question,
+                expectedConcepts: fresh.expectedConcepts,
+                sampleStarter: fresh.sampleStarter,
+              }
+            : s
+        )
+      );
+      setQuestionSources((prev) => ({ ...prev, [shield.id]: fresh.source }));
+      setAnswer("");
+      setResult(null);
+    } finally {
+      setGeneratingQuestion(false);
+    }
+  };
 
   const handleEvaluate = async () => {
     if (!answer.trim() || loading) return;
@@ -139,9 +184,27 @@ export function InterviewBossDuel() {
       {/* Arena Split: Prompt + Input on Left, Rubric Evaluation on Right */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
         <div className="nexus-panel rounded-2xl p-6 space-y-4">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-[#8B5CF6] font-semibold">{shield.stage}</span>
-            <span className="text-[#94A3B8]">{shield.difficulty}</span>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+            <div className="flex items-center gap-2">
+              <span className="text-[#8B5CF6] font-semibold">{shield.stage}</span>
+              <span className="text-[#94A3B8]">· {shield.difficulty}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {questionSources[shield.id] && (
+                <span className="text-[11px] text-[#00F5D4]">
+                  {questionSources[shield.id] === "gemini" ? "Gemini AI" : "Fresh Prompt"}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleNewQuestion}
+                disabled={generatingQuestion || loading}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-[#CBD5E1] hover:text-[#00F5D4] transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <RefreshCw className={`w-3 h-3 ${generatingQuestion ? "animate-spin" : ""}`} />
+                {generatingQuestion ? "Generating..." : "New Question"}
+              </button>
+            </div>
           </div>
 
           <p className="text-base font-medium text-[#F4F7FB] leading-relaxed">{shield.question}</p>

@@ -4,6 +4,7 @@ import {
   Briefcase,
   CalendarClock,
   Cpu,
+  GitBranch,
   GraduationCap,
   Layers,
   Lock,
@@ -284,6 +285,28 @@ export function Year2Hub({ onNavigate }: Year2HubProps) {
                 </div>
                 <span className="text-xs font-mono tabular-nums text-[#94A3B8] shrink-0">
                   {progress.savedProjects.length} Saved
+                </span>
+              </button>
+
+              <button
+                onClick={() => onNavigate({ screen: "placement-season", tab: "dsa-session" })}
+                className="w-full text-left rounded-xl p-4 bg-[#141926] border border-white/[0.08] hover:border-[#00F5D4]/60 transition-colors flex items-center justify-between gap-4 cursor-pointer group"
+              >
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="h-9 w-9 rounded-lg bg-[#00F5D4]/15 text-[#00F5D4] flex items-center justify-center shrink-0">
+                    <GitBranch className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#F4F7FB] group-hover:text-[#00F5D4] transition-colors">
+                      DSA Session · Logic → Code Morph
+                    </p>
+                    <p className="text-xs text-[#94A3B8] truncate">
+                      Turn plain English, voice, or flowcharts into C/Python/C++/Java step-by-step
+                    </p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono text-[#00F5D4] shrink-0">
+                  4 Langs
                 </span>
               </button>
             </div>

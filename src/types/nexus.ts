@@ -11,7 +11,7 @@ export type GameId =
 export type AppView =
   | { screen: "hub" }
   | { screen: "exam-season" }
-  | { screen: "placement-season"; tab?: "aptitude" | "interview" | "project-forge" }
+  | { screen: "placement-season"; tab?: "aptitude" | "interview" | "project-forge" | "dsa-session" }
   | { screen: "game"; gameId: GameId }
   | { screen: "custom-lab"; config: PyqLabConfig };
 

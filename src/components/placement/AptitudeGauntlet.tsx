@@ -1,16 +1,7 @@
-import { useEffect, useState } from "react";
-import { CheckCircle2, Clock, RotateCcw, Trophy, XCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, Clock, Loader2, RotateCcw, Sparkles, Trophy, XCircle } from "lucide-react";
+import { AptitudeQ, generateAptitudeQuestions } from "../../services/aiService";
 import { useNexus } from "../../store/useNexusStore";
-
-interface AptitudeQ {
-  id: string;
-  category: "Quantitative" | "Logical" | "Technical";
-  difficulty: "Easy" | "Medium" | "Hard";
-  question: string;
-  options: string[];
-  correctIdx: number;
-  explanation: string;
-}
 
 const QUESTION_BANK: AptitudeQ[] = [
   {
@@ -104,15 +95,19 @@ const QUESTION_BANK: AptitudeQ[] = [
 export function AptitudeGauntlet() {
   const { recordAptitudeResult } = useNexus();
   const [difficulty, setDifficulty] = useState<"All" | "Easy" | "Medium" | "Hard">("All");
+  const [questionBank, setQuestionBank] = useState<AptitudeQ[]>(QUESTION_BANK);
+  const [questionSource, setQuestionSource] = useState<"default" | "gemini" | "local">("default");
+  const [generating, setGenerating] = useState(false);
   const [activeIdx, setActiveIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(300);
+  const seenQuestionsRef = useRef<Set<string>>(new Set(QUESTION_BANK.map((q) => q.question)));
 
   const questions =
     difficulty === "All"
-      ? QUESTION_BANK
-      : QUESTION_BANK.filter((q) => q.difficulty === difficulty);
+      ? questionBank
+      : questionBank.filter((q) => q.difficulty === difficulty);
 
   const currentQ = questions[activeIdx] || questions[0];
 
@@ -131,7 +126,37 @@ export function AptitudeGauntlet() {
     setActiveIdx(0);
     setAnswers({});
     setSubmitted(false);
-    setSecondsLeft(d === "All" ? 300 : 150);
+    setSecondsLeft(d === "All" ? 300 : 180);
+  };
+
+  const handleGenerateNew = async () => {
+    if (generating) return;
+    setGenerating(true);
+    try {
+      const targetCount = difficulty === "All" ? 6 : 5;
+      const res = await generateAptitudeQuestions({
+        difficulty,
+        count: targetCount,
+        avoidQuestions: Array.from(seenQuestionsRef.current).slice(-24),
+      });
+
+      res.questions.forEach((q) => seenQuestionsRef.current.add(q.question));
+
+      setQuestionBank((prev) => {
+        if (difficulty === "All") {
+          return res.questions;
+        }
+        const remaining = prev.filter((q) => q.difficulty !== difficulty);
+        return [...remaining, ...res.questions];
+      });
+      setQuestionSource(res.source);
+      setActiveIdx(0);
+      setAnswers({});
+      setSubmitted(false);
+      setSecondsLeft(difficulty === "All" ? 300 : 180);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const handleFinish = () => {
@@ -176,7 +201,19 @@ export function AptitudeGauntlet() {
           ))}
         </div>
 
-        <div className="flex items-center gap-4 font-mono text-xs tabular-nums">
+        <div className="flex flex-wrap items-center gap-3 font-mono text-xs tabular-nums">
+          <button
+            onClick={handleGenerateNew}
+            disabled={generating}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8B5CF6]/20 border border-[#8B5CF6]/50 text-[#DDD6FE] hover:bg-[#8B5CF6]/35 hover:text-white transition-colors disabled:opacity-60 cursor-pointer"
+          >
+            {generating ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Sparkles className="w-3.5 h-3.5 text-[#00F5D4]" />
+            )}
+            {generating ? "Generating..." : "Generate New Questions"}
+          </button>
           <span className="inline-flex items-center gap-1.5 text-[#F59E0B]">
             <Clock className="w-4 h-4" />
             {String(mins).padStart(2, "0")}:{String(secs).padStart(2, "0")}
@@ -243,12 +280,26 @@ export function AptitudeGauntlet() {
                 })}
               </div>
 
-              <button
-                onClick={() => handleDifficultyChange(difficulty)}
-                className="px-5 py-2.5 rounded-xl bg-[#00F5D4] text-[#06080E] text-xs font-bold cursor-pointer"
-              >
-                Retake Gauntlet
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  onClick={() => handleDifficultyChange(difficulty)}
+                  className="px-5 py-2.5 rounded-xl bg-white/[0.08] hover:bg-white/[0.14] text-[#F4F7FB] text-xs font-semibold cursor-pointer"
+                >
+                  Retake Current Set
+                </button>
+                <button
+                  onClick={handleGenerateNew}
+                  disabled={generating}
+                  className="px-5 py-2.5 rounded-xl bg-[#00F5D4] hover:bg-[#00DFC0] text-[#06080E] text-xs font-bold inline-flex items-center gap-2 disabled:opacity-60 cursor-pointer"
+                >
+                  {generating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-3.5 h-3.5" />
+                  )}
+                  {generating ? "Generating Fresh Set..." : "Generate New Questions"}
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -318,7 +369,16 @@ export function AptitudeGauntlet() {
 
         {/* Question Palette */}
         <div className="nexus-panel rounded-2xl p-6 space-y-4">
-          <h4 className="text-sm font-semibold text-[#F4F7FB]">Question Navigator</h4>
+          <div className="flex items-center justify-between gap-2">
+            <h4 className="text-sm font-semibold text-[#F4F7FB]">Question Navigator</h4>
+            <span className="text-[11px] font-mono text-[#94A3B8]">
+              {questionSource === "gemini"
+                ? "Gemini AI Set"
+                : questionSource === "local"
+                ? "Adaptive Set"
+                : "Core Bank"}
+            </span>
+          </div>
           <div className="grid grid-cols-3 gap-2 font-mono text-xs">
             {questions.map((q, idx) => {
               const answered = answers[q.id] !== undefined;
