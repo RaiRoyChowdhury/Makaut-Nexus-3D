@@ -1,4 +1,4 @@
-import { Check, ChevronRight, Sparkles, Wand2, X } from "lucide-react";
+import { Check, ChevronRight, FileDown, Sparkles, Wand2, X } from "lucide-react";
 import { AppView } from "../types/nexus";
 
 interface JudgeDemoDrawerProps {
@@ -112,6 +112,15 @@ export function JudgeDemoDrawer({
         <Wand2 className="w-3.5 h-3.5" />
         PYQ / TOPIC → 3D LAB
       </button>
+
+      <a
+        href="/MAKAUT_NEXUS_3D_Technical_Guidebook.pdf"
+        download="MAKAUT_NEXUS_3D_Technical_Guidebook.pdf"
+        className="w-full py-2 px-3 rounded-xl bg-[#8B5CF6]/15 border border-[#8B5CF6]/50 text-[#DDD6FE] hover:bg-[#8B5CF6] hover:text-white text-xs font-mono font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+      >
+        <FileDown className="w-3.5 h-3.5" />
+        DOWNLOAD GUIDEBOOK (PDF)
+      </a>
 
       <div className="space-y-1.5">
         {DEMO_STEPS.map((step) => {

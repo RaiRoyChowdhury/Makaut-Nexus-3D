@@ -17,17 +17,68 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
 
   return (
     <header className="sticky top-0 z-40 h-16 w-full border-b border-white/[0.08] bg-[#06080E]/92 px-3 sm:px-4 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
-      {/* Zone 1: Brand */}
+      {/* Zone 1: Unique Geometric 3D Brand Logo */}
       <button
         onClick={() => onNavigate({ screen: "hub" })}
         className="flex items-center gap-2 sm:gap-3 text-left whitespace-nowrap shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded cursor-pointer"
       >
-        <span className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-[#00F5D4]/15 border border-[#00F5D4]/40 flex items-center justify-center text-[#00F5D4] font-mono text-[11px] sm:text-xs font-bold">
-          MN
+        <span
+          aria-hidden="true"
+          className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br from-[#00F5D4]/18 via-[#0B1220] to-[#8B5CF6]/25 border border-[#00F5D4]/45 shadow-[0_0_16px_rgba(0,245,212,0.18)] group-hover:shadow-[0_0_22px_rgba(0,245,212,0.38)] group-hover:border-[#00F5D4]/80 flex items-center justify-center transition-all shrink-0"
+        >
+          <svg
+            viewBox="0 0 36 36"
+            className="w-6 h-6"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <defs>
+              <linearGradient id="nexusHexGrad" x1="4" y1="4" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stopColor="#00F5D4" />
+                <stop offset="100%" stopColor="#8B5CF6" />
+              </linearGradient>
+            </defs>
+            {/* Outer Isometric 3D Hex Cube */}
+            <polygon
+              points="18,3 31,10.5 31,25.5 18,33 5,25.5 5,10.5"
+              stroke="url(#nexusHexGrad)"
+              strokeWidth="1.8"
+              strokeLinejoin="round"
+            />
+            {/* Isometric Cube Internal Axes */}
+            <path
+              d="M5.5 10.8L18 18L30.5 10.8M18 18V32.5"
+              stroke="#8B5CF6"
+              strokeOpacity="0.65"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
+            {/* Nexus "N" Circuit Spine + Orbital Vertices */}
+            <path
+              d="M11.5 23.5V13L24.5 23V12.5"
+              stroke="#00F5D4"
+              strokeWidth="2.1"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <circle cx="18" cy="3" r="1.9" fill="#00F5D4" />
+            <circle cx="11.5" cy="13" r="1.7" fill="#F4F7FB" />
+            <circle cx="24.5" cy="23" r="1.7" fill="#F4F7FB" />
+            <circle cx="24.5" cy="12.5" r="1.7" fill="#A78BFA" />
+          </svg>
         </span>
         <span className="flex flex-col leading-tight">
-          <span className="text-xs sm:text-sm font-bold tracking-tight text-[#F4F7FB] group-hover:text-[#00F5D4] transition-colors">
-            MAKAUT NEXUS <span className="hidden md:inline text-[#94A3B8] font-normal">B.TECH IT</span>
+          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold tracking-tight text-[#F4F7FB]">
+            <span className="tracking-wider">MAKAUT</span>
+            <span className="bg-gradient-to-r from-[#00F5D4] via-[#67E8F9] to-[#A78BFA] bg-clip-text text-transparent group-hover:brightness-110 transition-all">
+              NEXUS
+            </span>
+            <span className="font-mono text-[10px] font-bold px-1 py-0.5 rounded bg-[#00F5D4]/14 border border-[#00F5D4]/35 text-[#00F5D4] leading-none">
+              3D
+            </span>
+            <span className="hidden md:inline text-[#94A3B8] font-mono text-[11px] font-medium pl-0.5">
+              B.TECH IT
+            </span>
           </span>
           <span className="hidden sm:block text-[11px] font-mono text-[#94A3B8]">
             MAKAUT SYLLABUS · SEM 03

@@ -107,7 +107,7 @@ export function GameHudLayout({
   }, []);
 
   return (
-    <div className="relative w-full h-[calc(100vh-4rem)] overflow-hidden bg-[#06080E]">
+    <div className="relative w-full h-[calc(100dvh-4rem)] min-h-[420px] overflow-hidden bg-[#06080E]">
       {/* Full-bleed 3D Viewport */}
       <div className="absolute inset-0 z-0">{children}</div>
 
@@ -215,41 +215,42 @@ export function GameHudLayout({
         </div>
       </div>
 
-      {/* Feedback / Hint Toast Strip (above bottom dock) */}
-      {(hintText || feedbackBanner) && !dockCollapsed && (
-        <div className="pointer-events-none absolute bottom-[218px] md:bottom-[178px] left-1/2 -translate-x-1/2 z-20 w-[min(920px,94vw)] flex flex-col gap-2">
-          {feedbackBanner && (
-            <div
-              className={`pointer-events-auto rounded-lg px-4 py-2 text-xs font-medium border ${
-                feedbackBanner.type === "error"
-                  ? "bg-[#2A1215]/95 border-[#EF4444]/50 text-[#FCA5A5]"
-                  : feedbackBanner.type === "success"
-                  ? "bg-[#0D281E]/95 border-[#10B981]/50 text-[#6EE7B7]"
-                  : "bg-[#0F172A]/95 border-[#00F5D4]/40 text-[#E2E8F0]"
-              }`}
-            >
-              {feedbackBanner.text}
-            </div>
-          )}
-          {hintText && (
-            <div className="pointer-events-auto rounded-lg px-4 py-2.5 bg-[#12162A]/95 border border-[#8B5CF6]/50 text-xs text-[#E2E8F0] flex items-start gap-2.5">
-              <Sparkles className="w-4 h-4 text-[#00F5D4] shrink-0 mt-0.5" />
-              <div className="min-w-0">
-                <span className="font-mono text-[10px] text-[#00F5D4] mr-2">
-                  3D HINT BEAM ({hintSource === "gemini" ? "GEMINI AI" : "LOCAL TUTOR"}):
-                </span>
-                <span>{hintText}</span>
+      {/* Unified Bottom Dock Stack (Toasts + Persistent AI Intuition + Collapsible Controls) */}
+      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[min(980px,95vw)] flex flex-col items-center gap-2">
+        {/* Feedback / Hint Toast Strip — stacked cleanly inside bottom column so it never overlaps AI Intuition */}
+        {(hintText || feedbackBanner) && (
+          <div className="w-full flex flex-col gap-2">
+            {feedbackBanner && (
+              <div
+                className={`pointer-events-auto rounded-lg px-4 py-2 text-xs font-medium border ${
+                  feedbackBanner.type === "error"
+                    ? "bg-[#2A1215]/95 border-[#EF4444]/50 text-[#FCA5A5]"
+                    : feedbackBanner.type === "success"
+                    ? "bg-[#0D281E]/95 border-[#10B981]/50 text-[#6EE7B7]"
+                    : "bg-[#0F172A]/95 border-[#00F5D4]/40 text-[#E2E8F0]"
+                }`}
+              >
+                {feedbackBanner.text}
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+            {hintText && (
+              <div className="pointer-events-auto rounded-lg px-4 py-2.5 bg-[#12162A]/95 border border-[#8B5CF6]/50 text-xs text-[#E2E8F0] flex items-start gap-2.5">
+                <Sparkles className="w-4 h-4 text-[#00F5D4] shrink-0 mt-0.5" />
+                <div className="min-w-0 leading-relaxed">
+                  <span className="font-mono text-[10px] text-[#00F5D4] mr-2">
+                    3D HINT BEAM ({hintSource === "gemini" ? "GEMINI AI" : "LOCAL TUTOR"}):
+                  </span>
+                  <span>{hintText}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
-      {/* Collapsible Unified Bottom Control Dock */}
-      <div className="pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 z-20 w-[min(980px,95vw)] flex flex-col items-center">
         <button
+          type="button"
           onClick={() => setDockCollapsed((c) => !c)}
-          className="pointer-events-auto mb-1.5 px-3 py-1 rounded-full bg-[#0D111A]/95 border border-white/10 text-[11px] font-mono text-[#94A3B8] hover:text-[#F4F7FB] inline-flex items-center gap-1.5 cursor-pointer"
+          className="pointer-events-auto px-3 py-1 rounded-lg bg-[#0D111A]/95 border border-white/10 text-[11px] font-mono text-[#94A3B8] hover:text-[#F4F7FB] inline-flex items-center gap-1.5 cursor-pointer"
         >
           {dockCollapsed ? (
             <>
@@ -264,44 +265,46 @@ export function GameHudLayout({
           )}
         </button>
 
-        {!dockCollapsed && (
-          <div className="pointer-events-auto w-full nexus-panel rounded-2xl p-3.5 space-y-3">
-            {/* AI Tutor Intuition Strip + Waveform + Voice Toggle + 3D Hint Beam */}
-            <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 px-3 py-1.5 rounded-lg bg-[#090C14] border border-white/[0.06] text-xs">
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="font-mono text-[10px] font-semibold text-[#00F5D4] shrink-0">
-                  AI INTUITION
-                </span>
-                <span className="text-[#CBD5E1] truncate" title={intuitionText}>
-                  {intuitionText}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                <TutorWaveform
-                  supported={voiceSupported}
-                  enabled={voiceEnabled}
-                  speaking={isSpeaking}
-                  onToggle={toggleVoice}
-                />
-
-                <button
-                  onClick={onRequestHint}
-                  disabled={hintLoading}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#8B5CF6]/20 border border-[#8B5CF6]/45 text-[#DDD6FE] hover:bg-[#8B5CF6]/35 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <Sparkles className="w-3 h-3 text-[#00F5D4]" />
-                  {hintLoading ? "Scanning..." : "3D Hint Beam"}
-                </button>
-              </div>
+        <div className="pointer-events-auto w-full nexus-panel rounded-2xl p-3.5 space-y-3 max-h-[46vh] overflow-y-auto">
+          {/* AI Tutor Intuition Strip + Waveform + Voice Toggle + 3D Hint Beam (always visible & never truncated) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-3 py-2 rounded-lg bg-[#090C14] border border-[#00F5D4]/20 text-xs">
+            <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
+              <span className="font-mono text-[10px] font-semibold text-[#00F5D4] shrink-0 mt-0.5 sm:mt-0">
+                AI INTUITION
+              </span>
+              <p className="text-[#E2E8F0] leading-relaxed break-words">
+                {intuitionText}
+              </p>
             </div>
 
-            {/* Game-specific Controls + Primary Actions */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <TutorWaveform
+                supported={voiceSupported}
+                enabled={voiceEnabled}
+                speaking={isSpeaking}
+                onToggle={toggleVoice}
+              />
+
+              <button
+                type="button"
+                onClick={onRequestHint}
+                disabled={hintLoading}
+                className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#8B5CF6]/20 border border-[#8B5CF6]/45 text-[#DDD6FE] hover:bg-[#8B5CF6]/35 text-[11px] font-medium transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap"
+              >
+                <Sparkles className="w-3 h-3 text-[#00F5D4]" />
+                {hintLoading ? "Scanning..." : "3D Hint Beam"}
+              </button>
+            </div>
+          </div>
+
+          {/* Game-specific Controls + Primary Actions */}
+          {!dockCollapsed && (
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-1 border-t border-white/[0.06]">
               <div className="flex-1 min-w-0">{controlsSlot}</div>
 
               <div className="flex items-center gap-2 shrink-0">
                 <button
+                  type="button"
                   onClick={onReset}
                   className="px-3 py-2 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-[#CBD5E1] text-xs font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                 >
@@ -309,6 +312,7 @@ export function GameHudLayout({
                   Reset
                 </button>
                 <button
+                  type="button"
                   onClick={onValidate}
                   className="px-4 py-2 rounded-lg text-[#06080E] text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
                   style={{ backgroundColor: accentColor }}
@@ -318,8 +322,8 @@ export function GameHudLayout({
                 </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Mission Completion Modal */}
