@@ -20,6 +20,8 @@ import { AlgorithmVisualizer2D } from "./AlgorithmVisualizer2D";
 import { CodeMorphWindow } from "./CodeMorphWindow";
 import { LogicInputPanel } from "./LogicInputPanel";
 import { MathLogicXRay } from "./MathLogicXRay";
+import { useAuth } from "../../../store/useAuthStore";
+import { saveDsaSubmissionToCloud } from "../../../services/firebaseDataService";
 
 const STORAGE_KEY = "makaut_nexus_logic_morph_session_v1";
 
@@ -136,6 +138,7 @@ interface LogicToCodeSimulatorProps {
 }
 
 export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
+  const { user, isVerified, profile } = useAuth();
   const initial = loadSession();
   const [mode, setMode] = useState<"binary-search" | "two-sum-ii" | "custom">(
     initial.mode
@@ -373,6 +376,16 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
         ...prev,
         [targetLang]: result,
       }));
+      if (user && isVerified && profile && code.trim().length > 0) {
+        void saveDsaSubmissionToCloud(user.uid, {
+          problemId: mode === "custom" ? analysis.problemTitle || "custom-dsa" : mode,
+          language: targetLang,
+          code,
+          matchScore: result.matchScore,
+          verdict: result.verdict,
+          summary: result.summary,
+        }).catch((err) => console.error("DSA cloud sync failed:", err));
+      }
     } finally {
       setReviewingLang(null);
     }

@@ -1,6 +1,7 @@
-import { Flame, Lock, Play, ShieldCheck, Trophy, Volume2, VolumeX } from "lucide-react";
+import { Database, Flame, Lock, LogIn, Play, ShieldCheck, Trophy, UserCheck, Volume2, VolumeX } from "lucide-react";
 import { AppView } from "../types/nexus";
 import { useNexus } from "../store/useNexusStore";
+import { useAuth } from "../store/useAuthStore";
 import { MusicPlayerControl } from "./MusicPlayerControl";
 
 interface TopNavProps {
@@ -13,6 +14,7 @@ interface TopNavProps {
 export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps) {
   const { level, xpIntoLevel, xpForNextLevel, progress, voiceEnabled, voiceSupported, toggleVoice } =
     useNexus();
+  const { user, profile, role, setAuthModalOpen, setPortalModalOpen } = useAuth();
   const xpPct = Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100));
 
   return (
@@ -209,6 +211,32 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
           )}
           <span className="hidden lg:inline">
             {!voiceSupported ? "VOICE N/A" : voiceEnabled ? "TUTOR VOICE ON" : "TUTOR VOICE MUTED"}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPortalModalOpen(true)}
+          title="Open Cloud PYQ Vault, Cohort & Mentor/Admin RBAC Console"
+          className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg bg-[#8B5CF6]/14 border border-[#8B5CF6]/40 text-[#DDD6FE] hover:bg-[#8B5CF6]/25 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+        >
+          <Database className="w-3.5 h-3.5 text-[#A78BFA]" />
+          <span className="hidden lg:inline">Cloud Vault</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setAuthModalOpen(true)}
+          title={user ? `Signed in (${role.toUpperCase()})` : "Sign In / Create Account"}
+          className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg border text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+            user
+              ? "bg-[#10B981]/15 border-[#10B981]/45 text-[#6EE7B7] hover:bg-[#10B981]/25"
+              : "bg-white/[0.06] border-white/15 text-[#F4F7FB] hover:border-[#00F5D4]/55"
+          }`}
+        >
+          {user ? <UserCheck className="w-3.5 h-3.5" /> : <LogIn className="w-3.5 h-3.5 text-[#00F5D4]" />}
+          <span className="hidden sm:inline max-w-[110px] truncate">
+            {user ? `${(profile?.displayName || "Account").split(" ")[0]} · ${role.toUpperCase()}` : "Sign In"}
           </span>
         </button>
 

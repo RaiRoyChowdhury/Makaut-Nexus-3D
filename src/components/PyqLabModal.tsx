@@ -17,6 +17,9 @@ import {
   generatePyqLabFromImage,
 } from "../services/pyqLabService";
 import { VoiceTextControls } from "./VoiceTextControls";
+import { useAuth } from "../store/useAuthStore";
+import { savePyqHistoryToCloud, uploadPyqImageToStorage } from "../services/firebaseDataService";
+import { createSamplePyqImageFile } from "../utils/samplePyqImage";
 
 interface PyqLabModalProps {
   open: boolean;
@@ -25,6 +28,7 @@ interface PyqLabModalProps {
 }
 
 export function PyqLabModal({ open, onClose, onLaunchLab }: PyqLabModalProps) {
+  const { user, isVerified, profile, refreshCloudVault } = useAuth();
   const [query, setQuery] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
@@ -86,6 +90,21 @@ export function PyqLabModal({ open, onClose, onLaunchLab }: PyqLabModalProps) {
     setErrorMsg(null);
   };
 
+  const handleLoadSampleImage = async () => {
+    if (loading || extractingText) return;
+    setErrorMsg(null);
+    try {
+      const sampleFile = await createSamplePyqImageFile();
+      if (imagePreviewUrl) {
+        URL.revokeObjectURL(imagePreviewUrl);
+      }
+      setImageFile(sampleFile);
+      setImagePreviewUrl(URL.createObjectURL(sampleFile));
+    } catch {
+      setErrorMsg("Could not load sample PYQ photo.");
+    }
+  };
+
   const handleExtractOnly = async () => {
     if (!imageFile || extractingText || loading) return;
     setErrorMsg(null);
@@ -112,9 +131,23 @@ export function PyqLabModal({ open, onClose, onLaunchLab }: PyqLabModalProps) {
     setErrorMsg(null);
     setLoading(true);
     try {
-      const config = imageFile
-        ? await generatePyqLabFromImage(imageFile, trimmed)
-        : await generatePyqLab(trimmed);
+      const storagePromise =
+        imageFile && user && isVerified
+          ? uploadPyqImageToStorage(user.uid, imageFile, "pyq-uploads")
+          : Promise.resolve({ storagePath: "", imageUrl: "", storedInCloud: false });
+
+      const configPromise = imageFile
+        ? generatePyqLabFromImage(imageFile, trimmed)
+        : generatePyqLab(trimmed);
+
+      const [config, storageMeta] = await Promise.all([configPromise, storagePromise]);
+
+      if (user && isVerified && profile) {
+        void savePyqHistoryToCloud(user.uid, config, storageMeta)
+          .then(() => refreshCloudVault())
+          .catch((err) => console.error("Cloud PYQ history save failed:", err));
+      }
+
       clearImage();
       onLaunchLab(config);
       onClose();
@@ -164,9 +197,20 @@ export function PyqLabModal({ open, onClose, onLaunchLab }: PyqLabModalProps) {
 
         {/* Direct PYQ Question Pic Upload */}
         <div className="space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono text-[#94A3B8]">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-[#94A3B8]">
             <span>Upload PYQ Question Photo / Screenshot</span>
-            <span className="text-[11px] text-[#64748B]">PNG, JPG, WEBP · Max 4 MB</span>
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => void handleLoadSampleImage()}
+                disabled={loading || extractingText}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-[#8B5CF6]/18 border border-[#8B5CF6]/45 text-[11px] font-semibold text-[#DDD6FE] hover:bg-[#8B5CF6]/30 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                <Sparkles className="w-3 h-3" />
+                Use Sample PYQ Photo
+              </button>
+              <span className="text-[11px] text-[#64748B]">PNG, JPG, WEBP · Max 4 MB</span>
+            </div>
           </div>
 
           <input

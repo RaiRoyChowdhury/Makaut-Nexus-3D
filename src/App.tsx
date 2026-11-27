@@ -15,6 +15,10 @@ import { Game04BridgeOfKings } from "./games/Game04BridgeOfKings";
 import { Game05BreakEven } from "./games/Game05BreakEven";
 import { Game06StackSurgeon } from "./games/Game06StackSurgeon";
 import { CustomPyqLab } from "./games/CustomPyqLab";
+import { AuthProvider } from "./store/useAuthStore";
+import { FirebaseErrorBoundary } from "./components/FirebaseErrorBoundary";
+import { AuthAccountModal } from "./components/AuthAccountModal";
+import { RolePortalModal } from "./components/RolePortalModal";
 import { tutorVoice } from "./services/tutorVoice";
 
 function NexusAppShell() {
@@ -53,6 +57,12 @@ function NexusAppShell() {
       <PyqLabModal
         open={pyqModalOpen}
         onClose={() => setPyqModalOpen(false)}
+        onLaunchLab={(config) => handleNavigate({ screen: "custom-lab", config })}
+      />
+
+      <AuthAccountModal />
+
+      <RolePortalModal
         onLaunchLab={(config) => handleNavigate({ screen: "custom-lab", config })}
       />
 
@@ -98,14 +108,25 @@ function NexusAppShell() {
           />
         )}
       </div>
+
+      {!isDedicated3DGame && (
+        <footer className="relative z-10 border-t border-white/[0.06] bg-[#06080E]/90 px-4 py-3 text-center text-[11px] font-mono text-[#94A3B8]">
+          © 2026 MAKAUT NEXUS 3D · Created by{" "}
+          <span className="text-[#00F5D4] font-semibold">Rai Roy Chowdhury</span>
+        </footer>
+      )}
     </div>
   );
 }
 
 export default function App() {
   return (
-    <NexusProvider>
-      <NexusAppShell />
-    </NexusProvider>
+    <FirebaseErrorBoundary>
+      <AuthProvider>
+        <NexusProvider>
+          <NexusAppShell />
+        </NexusProvider>
+      </AuthProvider>
+    </FirebaseErrorBoundary>
   );
 }

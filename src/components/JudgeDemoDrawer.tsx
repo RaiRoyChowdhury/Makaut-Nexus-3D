@@ -148,6 +148,10 @@ export function JudgeDemoDrawer({
           );
         })}
       </div>
+
+      <div className="pt-2 border-t border-white/[0.08] text-center text-[10px] font-mono text-[#94A3B8]">
+        © 2026 Created by <span className="text-[#00F5D4]">Rai Roy Chowdhury</span>
+      </div>
     </aside>
   );
 }

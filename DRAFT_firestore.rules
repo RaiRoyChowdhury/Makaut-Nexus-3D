@@ -1,0 +1,581 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default-Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Startup connection probe path
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
+    // -------------------------------------------------------------------------
+    // Global Hardened Primitives
+    // -------------------------------------------------------------------------
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isBootstrappedAdmin() {
+      return isVerifiedUser() && request.auth.token.email == 'RAIROYCHOWDHURY@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrappedAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isMentorOrAdmin() {
+      return isAdmin() || (
+        isVerifiedUser() &&
+        exists(/databases/$(database)/documents/user_profiles/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/user_profiles/$(request.auth.uid)).data.role in ['mentor', 'admin']
+      );
+    }
+
+    function isStringBounded(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isNumberInRange(val, minVal, maxVal) {
+      return (val is int || val is float) && val >= minVal && val <= maxVal;
+    }
+
+    function isValidStringArray(arr, maxItems) {
+      return arr is list && arr.size() <= maxItems && (arr.size() == 0 || arr[0] is string);
+    }
+
+    // -------------------------------------------------------------------------
+    // Entity Validation Blueprints
+    // -------------------------------------------------------------------------
+    function isValidUserProfile(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'role', 'department', 'semester',
+          'xp', 'level', 'streak', 'simulatedCgpa', 'totalLevelsCompleted',
+          'isCohortVisible', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'displayName', 'role', 'department', 'semester',
+          'xp', 'level', 'streak', 'simulatedCgpa', 'totalLevelsCompleted',
+          'isCohortVisible', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isStringBounded(data.displayName, 2, 60) &&
+        data.role in ['student', 'mentor', 'admin'] &&
+        isStringBounded(data.department, 2, 40) &&
+        isStringBounded(data.semester, 1, 20) &&
+        isNumberInRange(data.xp, 0, 10000000) &&
+        isNumberInRange(data.level, 1, 500) &&
+        isNumberInRange(data.streak, 0, 3650) &&
+        isNumberInRange(data.simulatedCgpa, 0, 10) &&
+        isNumberInRange(data.totalLevelsCompleted, 0, 500) &&
+        data.isCohortVisible is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateAccount(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'rollNumber', 'authProvider', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'rollNumber', 'authProvider', 'createdAt', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isStringBounded(data.email, 3, 120) &&
+        isStringBounded(data.rollNumber, 0, 40) &&
+        data.authProvider in ['google', 'password'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidNexusProgress(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'xp', 'streak', 'lastActiveDate', 'completedLevels',
+          'bestScores', 'aptitudeBestScore', 'aptitudeAttempts',
+          'interviewShieldsCleared', 'activityLog', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'xp', 'streak', 'lastActiveDate', 'completedLevels',
+          'bestScores', 'aptitudeBestScore', 'aptitudeAttempts',
+          'interviewShieldsCleared', 'activityLog', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isNumberInRange(data.xp, 0, 10000000) &&
+        isNumberInRange(data.streak, 0, 3650) &&
+        isStringBounded(data.lastActiveDate, 4, 20) &&
+        data.completedLevels is map &&
+        data.bestScores is map &&
+        isNumberInRange(data.aptitudeBestScore, 0, 100) &&
+        isNumberInRange(data.aptitudeAttempts, 0, 100000) &&
+        data.interviewShieldsCleared is list &&
+        data.interviewShieldsCleared.size() <= 10 &&
+        (data.interviewShieldsCleared.size() == 0 || data.interviewShieldsCleared[0] is int || data.interviewShieldsCleared[0] is float) &&
+        data.activityLog is list &&
+        data.activityLog.size() <= 15 &&
+        (data.activityLog.size() == 0 || data.activityLog[0] is map) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidProjectBlueprint(data, userId, projectId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'title', 'domain', 'difficulty', 'problemStatement',
+          'proposedSolution', 'coreFeatures', 'techStack', 'roadmap',
+          'extensions', 'source', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'title', 'domain', 'difficulty', 'problemStatement',
+          'proposedSolution', 'coreFeatures', 'techStack', 'roadmap',
+          'extensions', 'source', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == projectId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isStringBounded(data.title, 2, 140) &&
+        isStringBounded(data.domain, 2, 80) &&
+        isStringBounded(data.difficulty, 2, 40) &&
+        isStringBounded(data.problemStatement, 4, 1200) &&
+        isStringBounded(data.proposedSolution, 4, 1500) &&
+        isValidStringArray(data.coreFeatures, 12) &&
+        isValidStringArray(data.techStack, 15) &&
+        isValidStringArray(data.roadmap, 12) &&
+        isValidStringArray(data.extensions, 10) &&
+        data.source in ['gemini', 'local'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidUserPyqHistory(data, userId, labId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'title', 'subjectCode', 'questionText', 'templateType',
+          'storagePath', 'imageUrl', 'config', 'completed', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'title', 'subjectCode', 'questionText', 'templateType',
+          'storagePath', 'imageUrl', 'config', 'completed', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == labId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isStringBounded(data.title, 2, 140) &&
+        isStringBounded(data.subjectCode, 2, 40) &&
+        isStringBounded(data.questionText, 2, 1500) &&
+        isStringBounded(data.templateType, 2, 60) &&
+        isStringBounded(data.storagePath, 0, 300) &&
+        isStringBounded(data.imageUrl, 0, 600) &&
+        data.config is map &&
+        data.completed is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidDsaSubmission(data, userId, submissionId) {
+      return data.keys().hasAll([
+          'id', 'uid', 'problemId', 'language', 'code',
+          'matchScore', 'verdict', 'summary', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'uid', 'problemId', 'language', 'code',
+          'matchScore', 'verdict', 'summary', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == submissionId &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isValidId(data.problemId) &&
+        data.language in ['python', 'cpp', 'java', 'c'] &&
+        isStringBounded(data.code, 1, 8000) &&
+        isNumberInRange(data.matchScore, 0, 100) &&
+        data.verdict in ['matched', 'partial', 'needs-work', 'draft'] &&
+        isStringBounded(data.summary, 0, 500) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidCuratedPyq(data, pyqId) {
+      return data.keys().hasAll([
+          'id', 'authorId', 'authorName', 'title', 'subjectCode',
+          'questionText', 'storagePath', 'imageUrl', 'config',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'id', 'authorId', 'authorName', 'title', 'subjectCode',
+          'questionText', 'storagePath', 'imageUrl', 'config',
+          'status', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.id) &&
+        data.id == pyqId &&
+        isValidId(data.authorId) &&
+        isStringBounded(data.authorName, 2, 60) &&
+        isStringBounded(data.title, 2, 140) &&
+        isStringBounded(data.subjectCode, 2, 40) &&
+        isStringBounded(data.questionText, 4, 1500) &&
+        isStringBounded(data.storagePath, 0, 300) &&
+        isStringBounded(data.imageUrl, 0, 600) &&
+        data.config is map &&
+        data.status in ['published', 'archived'] &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidMentorRequest(data, userId) {
+      return data.keys().hasAll([
+          'uid', 'displayName', 'department', 'facultyCode',
+          'justification', 'status', 'reviewedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'displayName', 'department', 'facultyCode',
+          'justification', 'status', 'reviewedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isStringBounded(data.displayName, 2, 60) &&
+        isStringBounded(data.department, 2, 40) &&
+        isStringBounded(data.facultyCode, 2, 40) &&
+        isStringBounded(data.justification, 4, 400) &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        isStringBounded(data.reviewedBy, 0, 128) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data, userId) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'email', 'createdAt']) &&
+        isValidId(data.uid) &&
+        data.uid == userId &&
+        isStringBounded(data.email, 3, 120) &&
+        data.createdAt is timestamp;
+    }
+
+    // -------------------------------------------------------------------------
+    // Collection Match Blocks
+    // -------------------------------------------------------------------------
+
+    // 1. Public/Cohort-Safe User Profiles (Zero PII)
+    match /user_profiles/{userId} {
+      allow get: if isValidId(userId) && (
+        isOwner(userId) ||
+        isMentorOrAdmin() ||
+        (isSignedIn() && existing().isCohortVisible == true)
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.uid == request.auth.uid ||
+        resource.data.isCohortVisible == true ||
+        isBootstrappedAdmin()
+      );
+
+      // Prevent self-assigned roles on create: non-admins must start as 'student'
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        (incoming().role == 'student' || isAdmin());
+
+      // Action-based update: Owner can update profile/telemetry (NEVER role); Admin can update role
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isOwner(userId) &&
+            incoming().role == existing().role &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'department', 'semester', 'xp', 'level',
+              'streak', 'simulatedCgpa', 'totalLevelsCompleted',
+              'isCohortVisible', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 2. Strictly Isolated Private PII + User Subcollections
+    match /users/{userId} {
+      allow read, write: if false;
+
+      match /private/account {
+        allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+        allow list: if false;
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isOwner(userId) &&
+          isValidPrivateAccount(incoming(), userId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidPrivateAccount(incoming(), userId) &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              isOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['rollNumber', 'email', 'updatedAt'])
+            )
+          );
+
+        allow delete: if isValidId(userId) && isAdmin();
+      }
+
+      match /progress/nexus {
+        allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+        allow list: if false;
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isOwner(userId) &&
+          isValidNexusProgress(incoming(), userId) &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidNexusProgress(incoming(), userId) &&
+          incoming().uid == existing().uid &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              isOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'xp', 'streak', 'lastActiveDate', 'completedLevels',
+                'bestScores', 'aptitudeBestScore', 'aptitudeAttempts',
+                'interviewShieldsCleared', 'activityLog', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      }
+
+      match /projects/{projectId} {
+        allow get: if isValidId(userId) && isValidId(projectId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (
+          resource.data.uid == request.auth.uid || isBootstrappedAdmin()
+        );
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(projectId) &&
+          isOwner(userId) &&
+          isValidProjectBlueprint(incoming(), userId, projectId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(projectId) &&
+          isValidProjectBlueprint(incoming(), userId, projectId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              isOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'title', 'domain', 'difficulty', 'problemStatement',
+                'proposedSolution', 'coreFeatures', 'techStack',
+                'roadmap', 'extensions', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isValidId(userId) && isValidId(projectId) && (isOwner(userId) || isAdmin());
+      }
+
+      match /pyq_history/{labId} {
+        allow get: if isValidId(userId) && isValidId(labId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (
+          resource.data.uid == request.auth.uid || isBootstrappedAdmin()
+        );
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(labId) &&
+          isOwner(userId) &&
+          isValidUserPyqHistory(incoming(), userId, labId) &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(labId) &&
+          isValidUserPyqHistory(incoming(), userId, labId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              isOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly(['completed', 'updatedAt'])
+            )
+          );
+
+        allow delete: if isValidId(userId) && isValidId(labId) && (isOwner(userId) || isAdmin());
+      }
+
+      match /dsa_submissions/{submissionId} {
+        allow get: if isValidId(userId) && isValidId(submissionId) && (isOwner(userId) || isAdmin());
+        allow list: if isSignedIn() && (
+          resource.data.uid == request.auth.uid || isBootstrappedAdmin()
+        );
+
+        allow create: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(submissionId) &&
+          isOwner(userId) &&
+          isValidDsaSubmission(incoming(), userId, submissionId) &&
+          incoming().updatedAt == request.time;
+
+        allow update: if isVerifiedUser() &&
+          isValidId(userId) &&
+          isValidId(submissionId) &&
+          isValidDsaSubmission(incoming(), userId, submissionId) &&
+          incoming().id == existing().id &&
+          incoming().uid == existing().uid &&
+          incoming().problemId == existing().problemId &&
+          incoming().language == existing().language &&
+          incoming().updatedAt == request.time && (
+            isAdmin() ||
+            (
+              isOwner(userId) &&
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'code', 'matchScore', 'verdict', 'summary', 'updatedAt'
+              ])
+            )
+          );
+
+        allow delete: if isValidId(userId) && isValidId(submissionId) && (isOwner(userId) || isAdmin());
+      }
+    }
+
+    // 3. Mentor & Admin Curated PYQ Labs
+    match /curated_pyqs/{pyqId} {
+      allow get: if isValidId(pyqId) && isSignedIn() && (
+        existing().status == 'published' || isMentorOrAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.status == 'published' ||
+        resource.data.authorId == request.auth.uid ||
+        isBootstrappedAdmin()
+      );
+
+      allow create: if isVerifiedUser() &&
+        isValidId(pyqId) &&
+        isValidCuratedPyq(incoming(), pyqId) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        isMentorOrAdmin();
+
+      allow update: if isVerifiedUser() &&
+        isValidId(pyqId) &&
+        isValidCuratedPyq(incoming(), pyqId) &&
+        incoming().id == existing().id &&
+        incoming().authorId == existing().authorId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        isMentorOrAdmin() && (
+          isAdmin() ||
+          (
+            existing().authorId == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'subjectCode', 'questionText', 'status', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(pyqId) && (
+        isAdmin() ||
+        (isMentorOrAdmin() && existing().authorId == request.auth.uid)
+      );
+    }
+
+    // 4. Mentor Role Upgrade Requests (Terminal state locked for non-admins)
+    match /mentor_requests/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+
+      allow list: if isSignedIn() && (
+        resource.data.uid == request.auth.uid || isBootstrappedAdmin()
+      );
+
+      allow create: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isOwner(userId) &&
+        isValidMentorRequest(incoming(), userId) &&
+        incoming().status == 'pending' &&
+        incoming().reviewedBy == '' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(userId) &&
+        isValidMentorRequest(incoming(), userId) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isOwner(userId) &&
+            existing().status == 'pending' &&
+            incoming().status == 'pending' &&
+            incoming().reviewedBy == existing().reviewedBy &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'displayName', 'department', 'facultyCode', 'justification', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isValidId(userId) && isAdmin();
+    }
+
+    // 5. Admin Registry
+    match /admins/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isBootstrappedAdmin();
+      allow create, update: if isBootstrappedAdmin() &&
+        isValidId(userId) &&
+        isValidAdminRecord(incoming(), userId) &&
+        incoming().createdAt == request.time;
+      allow delete: if isBootstrappedAdmin() && isValidId(userId);
+    }
+  }
+}
