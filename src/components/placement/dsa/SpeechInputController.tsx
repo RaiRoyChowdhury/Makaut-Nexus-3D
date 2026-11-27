@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import { Mic, MicOff, Square, X } from "lucide-react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
+import { Loader2, Mic, MicOff, Square, Upload, X } from "lucide-react";
+import { transcribeAudioBlob } from "../../../services/audioTranscribeService";
 
 interface SpeechRecognitionAlternativeLike {
   transcript: string;
@@ -52,14 +53,19 @@ export function SpeechInputController({
   });
 
   const [listening, setListening] = useState(false);
+  const [transcribingAudio, setTranscribingAudio] = useState(false);
   const [interimText, setInterimText] = useState("");
+  const [audioStatus, setAudioStatus] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const audioFileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<SpeechRecognitionInstanceLike | null>(null);
   const baseTextRef = useRef<string>("");
   const finalizedRef = useRef<string>("");
   const processedIdxRef = useRef<number>(0);
   const cancelledRef = useRef<boolean>(false);
+  const currentTextRef = useRef(currentText);
+  currentTextRef.current = currentText;
   const onTextChangeRef = useRef(onTextChange);
   onTextChangeRef.current = onTextChange;
 
@@ -182,62 +188,142 @@ export function SpeechInputController({
     setListening(false);
   };
 
-  if (!supported) {
-    return (
-      <div className="rounded-lg bg-[#090C14] border border-white/[0.07] px-3 py-2 flex items-center gap-2 text-xs text-[#94A3B8]">
-        <MicOff className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
-        <span>Voice input is not supported in this browser. You can type or upload your logic instead.</span>
-      </div>
-    );
-  }
+  const handleAudioUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    setErrorMsg(null);
+    setAudioStatus(null);
+    setTranscribingAudio(true);
+    try {
+      const transcript = await transcribeAudioBlob(
+        file,
+        file.name,
+        "DSA algorithm logic steps"
+      );
+      onTextChangeRef.current(mergeText(currentTextRef.current, transcript));
+      setAudioStatus(`Transcribed ${file.name}`);
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error ? err.message : "Could not transcribe uploaded voice note."
+      );
+    } finally {
+      setTranscribingAudio(false);
+    }
+  };
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
-        {!listening ? (
-          <button
-            type="button"
-            onClick={handleStart}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8B5CF6]/18 border border-[#8B5CF6]/45 text-[#DDD6FE] hover:bg-[#8B5CF6]/30 hover:text-white text-xs font-mono font-semibold transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Mic className="w-3.5 h-3.5 text-[#00F5D4]" />
-            SPEAK LOGIC
-          </button>
-        ) : (
-          <>
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/45 text-[#FCA5A5] text-xs font-mono font-semibold">
-              <Mic className="w-3.5 h-3.5 text-[#EF4444]" />
-              Listening (en-US)
+      <input
+        ref={audioFileInputRef}
+        type="file"
+        accept="audio/*,.mp3,.wav,.m4a,.ogg,.webm,.aac"
+        onChange={handleAudioUpload}
+        className="hidden"
+      />
+
+      {!supported ? (
+        <div className="space-y-2">
+          <div className="rounded-lg bg-[#090C14] border border-white/[0.07] px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[#94A3B8]">
+            <span className="inline-flex items-center gap-2">
+              <MicOff className="w-3.5 h-3.5 text-[#F59E0B] shrink-0" />
+              <span>Voice input is not supported in this browser. You can type or upload your logic instead.</span>
             </span>
             <button
               type="button"
-              onClick={handleStop}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00F5D4] text-[#06080E] text-xs font-mono font-bold cursor-pointer whitespace-nowrap"
+              onClick={() => audioFileInputRef.current?.click()}
+              disabled={transcribingAudio}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/12 text-[#CBD5E1] hover:border-[#00F5D4]/50 hover:text-[#00F5D4] text-[11px] font-mono cursor-pointer whitespace-nowrap disabled:opacity-50"
             >
-              <Square className="w-3 h-3" />
-              Stop
+              {transcribingAudio ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Transcribing...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-3 h-3 text-[#00F5D4]" />
+                  UPLOAD VOICE
+                </>
+              )}
             </button>
-            <button
-              type="button"
-              onClick={handleCancel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/10 text-[#CBD5E1] hover:text-white text-xs font-mono cursor-pointer whitespace-nowrap"
-            >
-              <X className="w-3.5 h-3.5" />
-              Cancel
-            </button>
-          </>
-        )}
-      </div>
-
-      {listening && interimText && (
-        <div className="rounded-lg bg-[#090C14] border border-[#00F5D4]/30 px-3 py-2 text-xs text-[#94A3B8]">
-          <span className="font-mono text-[#00F5D4] mr-2">Interim:</span>
-          <span className="italic text-[#CBD5E1]">{interimText}</span>
+          </div>
+          {audioStatus && <p className="text-[11px] font-mono text-[#10B981]">{audioStatus}</p>}
+          {errorMsg && <p className="text-xs text-[#F59E0B]">{errorMsg}</p>}
         </div>
-      )}
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            {!listening ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleStart}
+                  disabled={transcribingAudio}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8B5CF6]/18 border border-[#8B5CF6]/45 text-[#DDD6FE] hover:bg-[#8B5CF6]/30 hover:text-white text-xs font-mono font-semibold transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+                >
+                  <Mic className="w-3.5 h-3.5 text-[#00F5D4]" />
+                  SPEAK LOGIC
+                </button>
+                <button
+                  type="button"
+                  onClick={() => audioFileInputRef.current?.click()}
+                  disabled={transcribingAudio}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.05] border border-white/12 text-[#CBD5E1] hover:border-[#00F5D4]/50 hover:text-[#00F5D4] text-xs font-mono font-medium transition-colors cursor-pointer whitespace-nowrap disabled:opacity-50"
+                >
+                  {transcribingAudio ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#00F5D4]" />
+                      Transcribing...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5 text-[#00F5D4]" />
+                      UPLOAD VOICE
+                    </>
+                  )}
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#EF4444]/15 border border-[#EF4444]/45 text-[#FCA5A5] text-xs font-mono font-semibold">
+                  <Mic className="w-3.5 h-3.5 text-[#EF4444]" />
+                  Listening (en-US)
+                </span>
+                <button
+                  type="button"
+                  onClick={handleStop}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#00F5D4] text-[#06080E] text-xs font-mono font-bold cursor-pointer whitespace-nowrap"
+                >
+                  <Square className="w-3 h-3" />
+                  Stop
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancel}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.06] border border-white/10 text-[#CBD5E1] hover:text-white text-xs font-mono cursor-pointer whitespace-nowrap"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
 
-      {errorMsg && (
-        <p className="text-xs text-[#F59E0B]">{errorMsg}</p>
+          {audioStatus && !listening && (
+            <p className="text-[11px] font-mono text-[#10B981]">{audioStatus}</p>
+          )}
+
+          {listening && interimText && (
+            <div className="rounded-lg bg-[#090C14] border border-[#00F5D4]/30 px-3 py-2 text-xs text-[#94A3B8]">
+              <span className="font-mono text-[#00F5D4] mr-2">Interim:</span>
+              <span className="italic text-[#CBD5E1]">{interimText}</span>
+            </div>
+          )}
+
+          {errorMsg && <p className="text-xs text-[#F59E0B]">{errorMsg}</p>}
+        </>
       )}
     </div>
   );

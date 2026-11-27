@@ -3,12 +3,16 @@ import { ArrowLeft, GitBranch, RotateCcw } from "lucide-react";
 import { PRESET_PROBLEMS } from "../../../data/localDsaPresets";
 import {
   cancelPendingLogicScan,
+  reviewStudentCode,
   scanAndMorphLogic,
 } from "../../../services/logicMorphService";
 import {
+  CodeViewMode,
   ExtractedClause,
   LogicMorphAnalysis,
+  PerLanguageCodeReview,
   PerLanguagePracticeState,
+  PerLanguageStudentCode,
   PROGRAMMING_LANGUAGES,
   ProgrammingLanguage,
 } from "../../../types/logicMorph";
@@ -26,9 +30,24 @@ const EMPTY_PRACTICE: PerLanguagePracticeState = {
   java: {},
 };
 
+const EMPTY_STUDENT_CODE: PerLanguageStudentCode = {
+  c: "",
+  python: "",
+  cpp: "",
+  java: "",
+};
+
+const EMPTY_CODE_REVIEW: PerLanguageCodeReview = {
+  c: null,
+  python: null,
+  cpp: null,
+  java: null,
+};
+
 interface PersistedSimulatorState {
   mode: "binary-search" | "two-sum-ii" | "custom";
   language: ProgrammingLanguage;
+  codeViewMode: CodeViewMode;
   problemStatement: string;
   logicText: string;
   pseudocode: string;
@@ -36,6 +55,7 @@ interface PersistedSimulatorState {
   expectedOutput: string;
   activeStepIdx: number;
   practiceState: PerLanguagePracticeState;
+  studentCodeByLang: PerLanguageStudentCode;
   analysis: LogicMorphAnalysis;
 }
 
@@ -44,6 +64,7 @@ function getDefaultSession(): PersistedSimulatorState {
   return {
     mode: "binary-search",
     language: "python",
+    codeViewMode: "full",
     problemStatement: bs.problemStatement,
     logicText: bs.defaultEnglishLogic,
     pseudocode: "",
@@ -51,6 +72,7 @@ function getDefaultSession(): PersistedSimulatorState {
     expectedOutput: bs.expectedOutput,
     activeStepIdx: 0,
     practiceState: structuredClone(EMPTY_PRACTICE),
+    studentCodeByLang: { ...EMPTY_STUDENT_CODE },
     analysis: structuredClone(bs.analysis),
   };
 }
@@ -76,6 +98,12 @@ function loadSession(): PersistedSimulatorState {
         parsed.language === "java"
           ? parsed.language
           : def.language,
+      codeViewMode:
+        parsed.codeViewMode === "full" ||
+        parsed.codeViewMode === "practice" ||
+        parsed.codeViewMode === "write"
+          ? parsed.codeViewMode
+          : "full",
       problemStatement: parsed.problemStatement ?? def.problemStatement,
       logicText: parsed.logicText ?? def.logicText,
       pseudocode: parsed.pseudocode ?? "",
@@ -89,6 +117,12 @@ function loadSession(): PersistedSimulatorState {
         python: parsed.practiceState?.python ?? {},
         cpp: parsed.practiceState?.cpp ?? {},
         java: parsed.practiceState?.java ?? {},
+      },
+      studentCodeByLang: {
+        c: parsed.studentCodeByLang?.c ?? "",
+        python: parsed.studentCodeByLang?.python ?? "",
+        cpp: parsed.studentCodeByLang?.cpp ?? "",
+        java: parsed.studentCodeByLang?.java ?? "",
       },
       analysis: parsed.analysis,
     };
@@ -107,6 +141,9 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     initial.mode
   );
   const [language, setLanguage] = useState<ProgrammingLanguage>(initial.language);
+  const [codeViewMode, setCodeViewMode] = useState<CodeViewMode>(
+    initial.codeViewMode
+  );
   const [problemStatement, setProblemStatement] = useState(
     initial.problemStatement
   );
@@ -119,6 +156,13 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
   const [practiceState, setPracticeState] = useState<PerLanguagePracticeState>(
     initial.practiceState
   );
+  const [studentCodeByLang, setStudentCodeByLang] = useState<PerLanguageStudentCode>(
+    initial.studentCodeByLang
+  );
+  const [codeReviewByLang, setCodeReviewByLang] = useState<PerLanguageCodeReview>({
+    ...EMPTY_CODE_REVIEW,
+  });
+  const [reviewingLang, setReviewingLang] = useState<ProgrammingLanguage | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1900);
@@ -132,6 +176,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
       const payload: PersistedSimulatorState = {
         mode,
         language,
+        codeViewMode,
         problemStatement,
         logicText,
         pseudocode,
@@ -139,6 +184,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
         expectedOutput,
         activeStepIdx,
         practiceState,
+        studentCodeByLang,
         analysis,
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -148,6 +194,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
   }, [
     mode,
     language,
+    codeViewMode,
     problemStatement,
     logicText,
     pseudocode,
@@ -155,6 +202,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     expectedOutput,
     activeStepIdx,
     practiceState,
+    studentCodeByLang,
     analysis,
   ]);
 
@@ -197,6 +245,8 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     setAnalysis(structuredClone(preset.analysis));
     setActiveStepIdx(0);
     setPracticeState(structuredClone(EMPTY_PRACTICE));
+    setStudentCodeByLang({ ...EMPTY_STUDENT_CODE });
+    setCodeReviewByLang({ ...EMPTY_CODE_REVIEW });
   };
 
   const runScan = async (opts: {
@@ -229,6 +279,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
       setAnalysis(res.analysis);
       setActiveStepIdx(0);
       setPracticeState(structuredClone(EMPTY_PRACTICE));
+      setCodeReviewByLang({ ...EMPTY_CODE_REVIEW });
       if (res.notice) {
         setScanNotice(res.notice);
       }
@@ -301,6 +352,32 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     }
   };
 
+  const handleStudentCodeChange = (nextCode: string) => {
+    setStudentCodeByLang((prev) => ({
+      ...prev,
+      [language]: nextCode,
+    }));
+  };
+
+  const handleCheckStudentCode = async () => {
+    const targetLang = language;
+    const code = studentCodeByLang[targetLang] ?? "";
+    setReviewingLang(targetLang);
+    try {
+      const result = await reviewStudentCode({
+        language: targetLang,
+        analysis,
+        studentCode: code,
+      });
+      setCodeReviewByLang((prev) => ({
+        ...prev,
+        [targetLang]: result,
+      }));
+    } finally {
+      setReviewingLang(null);
+    }
+  };
+
   const handleResetSession = () => {
     cancelPendingLogicScan();
     setIsPlaying(false);
@@ -308,6 +385,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     const def = getDefaultSession();
     setMode(def.mode);
     setLanguage(def.language);
+    setCodeViewMode(def.codeViewMode);
     setProblemStatement(def.problemStatement);
     setLogicText(def.logicText);
     setPseudocode(def.pseudocode);
@@ -316,6 +394,8 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     setAnalysis(def.analysis);
     setActiveStepIdx(0);
     setPracticeState(def.practiceState);
+    setStudentCodeByLang({ ...EMPTY_STUDENT_CODE });
+    setCodeReviewByLang({ ...EMPTY_CODE_REVIEW });
   };
 
   const clauses = analysis.extractedClauses;
@@ -325,6 +405,7 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
     clauses.length > 0 ? Math.round(((safeStepIdx + 1) / clauses.length) * 100) : 0;
   const activeLangLabel =
     PROGRAMMING_LANGUAGES.find((l) => l.id === language)?.label ?? "Python";
+  const isWriteMode = codeViewMode === "write";
 
   // Keep lint happy if hoveredLineNum is used as subtle tooltip/state
   void hoveredLineNum;
@@ -380,10 +461,10 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
         </div>
       </header>
 
-      {/* Three-Panel Desktop Workspace (Stacks cleanly on tablet/mobile) */}
+      {/* Three-Panel Desktop Workspace (Stacks cleanly on tablet/mobile; widens center for side-by-side Write Code) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         {/* LEFT: Logic Input & Scanner */}
-        <div className="lg:col-span-4">
+        <div className={isWriteMode ? "lg:col-span-3" : "lg:col-span-4"}>
           <LogicInputPanel
             mode={mode}
             onSelectMode={handleSelectMode}
@@ -416,11 +497,13 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
         </div>
 
         {/* CENTER: Code Morph Window & Step Controls */}
-        <div className="lg:col-span-4">
+        <div className={isWriteMode ? "lg:col-span-6" : "lg:col-span-4"}>
           <CodeMorphWindow
             analysis={analysis}
             language={language}
             onLanguageChange={setLanguage}
+            viewMode={codeViewMode}
+            onViewModeChange={setCodeViewMode}
             activeStepIdx={safeStepIdx}
             onStepChange={(idx) => {
               setIsPlaying(false);
@@ -437,11 +520,16 @@ export function LogicToCodeSimulator({ onExit }: LogicToCodeSimulatorProps) {
             }}
             practiceState={practiceState}
             onPracticeAttempt={handlePracticeAttempt}
+            studentCode={studentCodeByLang[language] ?? ""}
+            onStudentCodeChange={handleStudentCodeChange}
+            codeReview={codeReviewByLang[language] ?? null}
+            reviewingCode={reviewingLang === language}
+            onCheckStudentCode={handleCheckStudentCode}
           />
         </div>
 
         {/* RIGHT: Math & Logic X-Ray + Visual State */}
-        <div className="lg:col-span-4 space-y-5">
+        <div className={`${isWriteMode ? "lg:col-span-3" : "lg:col-span-4"} space-y-5`}>
           <AlgorithmVisualizer2D
             visualState={activeClause?.visualState}
             algorithmName={analysis.algorithmName}

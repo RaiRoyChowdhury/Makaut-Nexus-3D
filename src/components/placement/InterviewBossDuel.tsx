@@ -6,6 +6,7 @@ import {
   InterviewEvalResult,
 } from "../../services/aiService";
 import { useNexus } from "../../store/useNexusStore";
+import { VoiceTextControls } from "../VoiceTextControls";
 
 interface BossShield {
   id: number;
@@ -121,18 +122,21 @@ export function InterviewBossDuel() {
   const handleEvaluate = async () => {
     if (!answer.trim() || loading) return;
     setLoading(true);
-    const evalRes = await evaluateInterviewAnswer({
-      shield: shield.stage,
-      question: shield.question,
-      expectedConcepts: shield.expectedConcepts,
-      userAnswer: answer,
-    });
-    setResult(evalRes);
-    setLoading(false);
+    try {
+      const evalRes = await evaluateInterviewAnswer({
+        shield: shield.stage,
+        question: shield.question,
+        expectedConcepts: shield.expectedConcepts,
+        userAnswer: answer,
+      });
+      setResult(evalRes);
 
-    const xpEarned = Math.round(evalRes.overallScore * 2.5);
-    if (evalRes.overallScore >= 60) {
-      recordInterviewShield(shield.id, evalRes.overallScore, xpEarned);
+      const xpEarned = Math.round(evalRes.overallScore * 2.5);
+      if (evalRes.overallScore >= 60) {
+        recordInterviewShield(shield.id, evalRes.overallScore, xpEarned);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -215,6 +219,15 @@ export function InterviewBossDuel() {
             onChange={(e) => setAnswer(e.target.value)}
             placeholder="Write your structured technical defense here (include mechanisms, complexity bounds, and trade-offs)..."
             className="w-full rounded-xl bg-[#090C14] border border-white/10 focus:border-[#00F5D4] focus:outline-none p-4 text-sm text-[#F4F7FB] placeholder:text-[#64748B] resize-y"
+          />
+
+          <VoiceTextControls
+            value={answer}
+            onChange={setAnswer}
+            contextHint={`Technical interview answer for ${shield.difficulty}`}
+            speakLabel="Speak Defense"
+            uploadLabel="Upload Voice Answer"
+            disabled={loading || generatingQuestion}
           />
 
           <div className="flex flex-wrap items-center justify-between gap-3">

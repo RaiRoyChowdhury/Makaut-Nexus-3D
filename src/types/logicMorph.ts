@@ -145,6 +145,30 @@ export type PerLanguagePracticeState = Record<
   Record<string, PracticeAttemptState>
 >;
 
+export type CodeViewMode = "full" | "practice" | "write";
+
+export type PerLanguageStudentCode = Record<ProgrammingLanguage, string>;
+
+export interface CodeReviewClauseCheck {
+  clauseTitle: string;
+  status: "matched" | "missing" | "issue";
+  reason: string;
+}
+
+export interface CodeReviewResult {
+  verdict: "aligned" | "partial" | "needs-work";
+  matchScore: number;
+  summary: string;
+  clauseChecks: CodeReviewClauseCheck[];
+  nextHint: string;
+  source: "gemini" | "local";
+}
+
+export type PerLanguageCodeReview = Record<
+  ProgrammingLanguage,
+  CodeReviewResult | null
+>;
+
 export interface PresetProblemDefinition {
   id: "binary-search" | "two-sum-ii";
   title: string;

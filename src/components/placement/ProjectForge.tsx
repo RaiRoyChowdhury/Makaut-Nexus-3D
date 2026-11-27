@@ -3,6 +3,7 @@ import { Bookmark, Check, Copy, Cpu, Layers, Sparkles, Trash2 } from "lucide-rea
 import { generateProjectBlueprint, ProjectForgeResult } from "../../services/aiService";
 import { useNexus } from "../../store/useNexusStore";
 import { AegisGrid3D } from "./AegisGrid3D";
+import { VoiceTextControls } from "../VoiceTextControls";
 
 const DOMAINS = [
   "Distributed Systems",
@@ -31,9 +32,12 @@ export function ProjectForge() {
   const handleGenerate = async () => {
     setLoading(true);
     setSavedNotice(false);
-    const res = await generateProjectBlueprint({ domain, difficulty, stack, projectType });
-    setBlueprint(res);
-    setLoading(false);
+    try {
+      const res = await generateProjectBlueprint({ domain, difficulty, stack, projectType });
+      setBlueprint(res);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCopy = () => {
@@ -154,6 +158,16 @@ export function ProjectForge() {
                 onChange={(e) => setStack(e.target.value)}
                 placeholder="e.g., React, Go, Postgres, Docker"
                 className="w-full rounded-xl bg-[#090C14] border border-white/10 px-3 py-2.5 text-sm text-[#F4F7FB] focus:border-[#00F5D4] focus:outline-none"
+              />
+              <VoiceTextControls
+                value={stack}
+                onChange={setStack}
+                contextHint="Software engineering tech stack list"
+                speakLabel="Speak Stack"
+                uploadLabel="Upload Voice"
+                compact
+                separator="comma"
+                disabled={loading}
               />
             </div>
 

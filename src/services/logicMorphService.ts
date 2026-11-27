@@ -4,6 +4,8 @@ import {
 } from "../data/localDsaPresets";
 import { isClientRateLimited, markClientRateLimited } from "./aiService";
 import {
+  CodeReviewClauseCheck,
+  CodeReviewResult,
   ExtractedClause,
   LogicMorphAnalysis,
   LogicRole,
@@ -586,6 +588,245 @@ export async function extractLogicFromImageFile(file: File): Promise<ImageOcrRes
       expectedOutput: String(data.expectedOutput ?? ""),
       summary: String(data.summary ?? "Extracted algorithm steps"),
     };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+export function buildStarterSkeleton(
+  language: ProgrammingLanguage,
+  fullLines: string[]
+): string {
+  const firstNonEmpty =
+    fullLines.find((line) => line.trim() && !line.trim().startsWith("//") && !line.trim().startsWith("#")) ??
+    "";
+
+  if (language === "python") {
+    const defLine = firstNonEmpty.trim().startsWith("def ")
+      ? firstNonEmpty
+      : "def solve(nums, target):";
+    return `${defLine}\n    # Translate each logic clause on the left into Python\n    pass\n`;
+  }
+
+  if (language === "java") {
+    const sig = firstNonEmpty.includes("(")
+      ? firstNonEmpty.replace(/\{.*$/, "").trim()
+      : "public int solve(int[] nums, int target)";
+    return `${sig} {\n    // Translate each logic clause into Java\n    \n}\n`;
+  }
+
+  const sig = firstNonEmpty.includes("(")
+    ? firstNonEmpty.replace(/\{.*$/, "").trim()
+    : language === "c"
+    ? "int solve(int arr[], int n, int target)"
+    : "int solve(const vector<int>& nums, int target)";
+
+  return `${sig} {\n    // Translate each logic clause into ${language === "c" ? "C" : "C++"}\n    \n}\n`;
+}
+
+function extractSignificantTokens(lines: string[]): string[] {
+  const text = lines.join(" ").toLowerCase();
+  const matches = text.match(/[a-z_]\w*|<=|>=|==|!=|\/\/|\+\+|--|\+|-|\*|\/|%/g) ?? [];
+  const stop = new Set(["int", "void", "const", "public", "let", "var", "return", "def", "if", "else"]);
+  return Array.from(new Set(matches.filter((t) => t.length >= 2 || /[<>=!+\-*/%]/.test(t)))).filter(
+    (t) => !stop.has(t) || t === "return" || t === "if"
+  );
+}
+
+export function buildLocalCodeReview(params: {
+  language: ProgrammingLanguage;
+  analysis: LogicMorphAnalysis;
+  studentCode: string;
+}): CodeReviewResult {
+  const normalizedStudent = params.studentCode.toLowerCase();
+  const compactStudent = normalizedStudent.replace(/\s+/g, "");
+  const refCodeText = (params.analysis.fullCode[params.language] ?? []).join("\n");
+  const compactRef = refCodeText.toLowerCase().replace(/\s+/g, "");
+
+  if (compactStudent && compactStudent === compactRef) {
+    return {
+      verdict: "aligned",
+      matchScore: 100,
+      summary: "Exact structural match with the verified reference implementation across all clauses.",
+      clauseChecks: params.analysis.extractedClauses.map((c) => ({
+        clauseTitle: c.englishSpan,
+        status: "matched",
+        reason: c.mathXRay.whyItWorks,
+      })),
+      nextHint: "Great job! Try switching to another language tab or writing a variant using different variable names.",
+      source: "local",
+    };
+  }
+
+  const clauses = params.analysis.extractedClauses;
+  let matchedCount = 0;
+  let issueCount = 0;
+
+  const clauseChecks: CodeReviewClauseCheck[] = clauses.map((clause) => {
+    const clauseRefLines = clause.codeLines[params.language] ?? [];
+    const expectedTokens = extractSignificantTokens(clauseRefLines);
+
+    // Check role-specific patterns + shared tokens
+    const roleHints: string[] = [];
+    if (clause.logicRole === "iteration" || clause.logicRole === "condition") {
+      roleHints.push("while", "for", "if");
+    }
+    if (clause.logicRole === "return") {
+      roleHints.push("return");
+    }
+
+    const tokenHits = expectedTokens.filter((tok) => normalizedStudent.includes(tok));
+    const roleHit = roleHints.length === 0 || roleHints.some((kw) => normalizedStudent.includes(kw));
+    const coverage = expectedTokens.length > 0 ? tokenHits.length / expectedTokens.length : 0;
+
+    // Gentle common off-by-one / overflow pattern check
+    const hasOverflowRisk =
+      (params.language === "c" || params.language === "cpp" || params.language === "java") &&
+      compactStudent.includes("(left+right)/2") ||
+      compactStudent.includes("(low+high)/2") ||
+      compactStudent.includes("(l+r)/2");
+
+    if (hasOverflowRisk && clause.englishSpan.toLowerCase().includes("mid")) {
+      issueCount += 1;
+      return {
+        clauseTitle: clause.englishSpan,
+        status: "issue",
+        reason: `Watch out for signed 32-bit overflow in (left + right) / 2 — prefer left + (right - left) / 2 so large indices stay safe.`,
+      };
+    }
+
+    if (coverage >= 0.55 && roleHit) {
+      matchedCount += 1;
+      return {
+        clauseTitle: clause.englishSpan,
+        status: "matched",
+        reason: `Implemented cleanly: ${clause.mathXRay.whyItWorks}`,
+      };
+    }
+
+    if (coverage >= 0.25 || (roleHints.length > 0 && roleHit && clauseRefLines.length > 0)) {
+      issueCount += 1;
+      return {
+        clauseTitle: clause.englishSpan,
+        status: "issue",
+        reason: `Partially present, check exact condition/update here (${clause.syntaxTip[params.language]}).`,
+      };
+    }
+
+    return {
+      clauseTitle: clause.englishSpan,
+      status: "missing",
+      reason: `Missing or incomplete step — needed because ${clause.mathXRay.whyItWorks.charAt(0).toLowerCase()}${clause.mathXRay.whyItWorks.slice(1)}`,
+    };
+  });
+
+  const total = Math.max(1, clauses.length);
+  const matchScore = Math.min(
+    98,
+    Math.round(((matchedCount + issueCount * 0.45) / total) * 100)
+  );
+  const verdict: CodeReviewResult["verdict"] =
+    matchScore >= 82 && issueCount === 0
+      ? "aligned"
+      : matchScore >= 40
+      ? "partial"
+      : "needs-work";
+
+  const firstGap = clauseChecks.find((c) => c.status !== "matched");
+
+  return {
+    verdict,
+    matchScore,
+    summary:
+      verdict === "aligned"
+        ? "Strong translation! Your code covers the key invariants and logic steps accurately."
+        : `Local check matched ${matchedCount}/${total} clauses cleanly${issueCount > 0 ? ` with ${issueCount} detail(s) to refine` : ""}.`,
+    clauseChecks,
+    nextHint: firstGap
+      ? `Focus next on "${firstGap.clauseTitle}": ${firstGap.reason}`
+      : "Verify edge cases like empty input or single-element arrays.",
+    source: "local",
+  };
+}
+
+export async function reviewStudentCode(params: {
+  language: ProgrammingLanguage;
+  analysis: LogicMorphAnalysis;
+  studentCode: string;
+}): Promise<CodeReviewResult> {
+  const trimmed = params.studentCode.trim();
+  if (trimmed.length < 10) {
+    return {
+      verdict: "needs-work",
+      matchScore: 0,
+      summary: "Write at least a few lines of code on the right before running a logic check.",
+      clauseChecks: [],
+      nextHint: "Click 'Starter Skeleton' if you want the function signature pre-filled.",
+      source: "local",
+    };
+  }
+
+  if (isClientRateLimited()) {
+    return buildLocalCodeReview(params);
+  }
+
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), 14000);
+
+  try {
+    const res = await fetch("/api/ai/logic-code-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({
+        language: params.language,
+        problemTitle: params.analysis.problemTitle,
+        algorithmName: params.analysis.algorithmName,
+        logicClauses: params.analysis.extractedClauses.map((c) => ({
+          englishSpan: c.englishSpan,
+        })),
+        referenceCode: (params.analysis.fullCode[params.language] ?? []).join("\n"),
+        studentCode: trimmed,
+      }),
+    });
+
+    if (res.status === 429) {
+      const errData = await res.clone().json().catch(() => ({}));
+      markClientRateLimited(errData?.retryAfterSeconds ?? 15);
+      return buildLocalCodeReview(params);
+    }
+
+    if (!res.ok) {
+      return buildLocalCodeReview(params);
+    }
+
+    const data = await res.json();
+    if (!data || !Array.isArray(data.clauseChecks)) {
+      return buildLocalCodeReview(params);
+    }
+
+    return {
+      verdict:
+        data.verdict === "aligned" ||
+        data.verdict === "partial" ||
+        data.verdict === "needs-work"
+          ? data.verdict
+          : "partial",
+      matchScore: Math.min(100, Math.max(0, Math.round(Number(data.matchScore ?? 50)))),
+      summary: String(data.summary ?? "Code reviewed against logic clauses."),
+      clauseChecks: data.clauseChecks.map((item: any) => ({
+        clauseTitle: String(item?.clauseTitle ?? "Clause"),
+        status:
+          item?.status === "matched" || item?.status === "missing" || item?.status === "issue"
+            ? item.status
+            : "issue",
+        reason: String(item?.reason ?? "Check this step against the reference logic."),
+      })),
+      nextHint: String(data.nextHint ?? "Test your boundary conditions carefully."),
+      source: "gemini",
+    };
+  } catch {
+    return buildLocalCodeReview(params);
   } finally {
     clearTimeout(timer);
   }

@@ -330,7 +330,7 @@ export async function generatePyqLab(query: string): Promise<PyqLabConfig> {
   }
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 4000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
   try {
     const res = await fetch("/api/ai/pyq-lab", {
@@ -363,6 +363,117 @@ export async function generatePyqLab(query: string): Promise<PyqLabConfig> {
       originalQuery: trimmed,
       source: "local",
     };
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+const ALLOWED_PYQ_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/webp"]);
+
+function resolveImageMime(file: File): string {
+  if (file.type && ALLOWED_PYQ_IMAGE_MIMES.has(file.type)) {
+    return file.type;
+  }
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  return file.type || "";
+}
+
+async function readImageAsBase64(file: File): Promise<{ mimeType: string; base64Data: string }> {
+  const mimeType = resolveImageMime(file);
+  if (!ALLOWED_PYQ_IMAGE_MIMES.has(mimeType)) {
+    throw new Error("Unsupported image type. Please upload a PNG, JPG, JPEG, or WEBP photo.");
+  }
+  if (file.size > 4 * 1024 * 1024) {
+    throw new Error("Image exceeds the 4 MB limit. Please upload a smaller or cropped photo.");
+  }
+
+  const base64Data = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result ?? "");
+      const idx = dataUrl.indexOf(",");
+      if (idx === -1) {
+        reject(new Error("Could not read image data."));
+        return;
+      }
+      resolve(dataUrl.slice(idx + 1));
+    };
+    reader.onerror = () => reject(new Error("Failed to read selected image file."));
+    reader.readAsDataURL(file);
+  });
+
+  return { mimeType, base64Data };
+}
+
+export async function extractPyqQuestionFromImage(file: File): Promise<string> {
+  const { mimeType, base64Data } = await readImageAsBase64(file);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 18000);
+
+  try {
+    const res = await fetch("/api/ai/pyq-lab-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mimeType,
+        base64Data,
+        fileName: file.name,
+        extractOnly: true,
+      }),
+      signal: controller.signal,
+    });
+    if (res.status === 429) {
+      const errData = await res.clone().json().catch(() => ({}));
+      markClientRateLimited(errData?.retryAfterSeconds ?? 15);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.extractedQuestion) {
+      throw new Error(data?.error || "Could not extract the question from this image.");
+    }
+    return String(data.extractedQuestion).trim();
+  } finally {
+    window.clearTimeout(timeoutId);
+  }
+}
+
+export async function generatePyqLabFromImage(
+  file: File,
+  extraNotes = ""
+): Promise<PyqLabConfig> {
+  const { mimeType, base64Data } = await readImageAsBase64(file);
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+
+  try {
+    const res = await fetch("/api/ai/pyq-lab-image", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mimeType,
+        base64Data,
+        fileName: file.name,
+        extraNotes: extraNotes.trim(),
+        extractOnly: false,
+      }),
+      signal: controller.signal,
+    });
+    if (res.status === 429) {
+      const errData = await res.clone().json().catch(() => ({}));
+      markClientRateLimited(errData?.retryAfterSeconds ?? 15);
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.error || "Could not analyze this PYQ question photo.");
+    }
+    const originalQuery = String(data?.extractedQuestion || extraNotes || file.name).trim();
+    const validated = validatePyqLabConfig(data, originalQuery, "gemini");
+    if (!validated) {
+      throw new Error("The extracted question could not be mapped cleanly to a 3D lab.");
+    }
+    return validated;
   } finally {
     window.clearTimeout(timeoutId);
   }

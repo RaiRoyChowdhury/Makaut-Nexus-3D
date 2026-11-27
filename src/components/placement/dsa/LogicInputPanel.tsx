@@ -5,6 +5,7 @@ import { ExtractedClause, LogicMorphAnalysis } from "../../../types/logicMorph";
 import { ClauseHighlighterPanel } from "./ClauseHighlighterPanel";
 import { FileUploadController } from "./FileUploadController";
 import { SpeechInputController } from "./SpeechInputController";
+import { VoiceTextControls } from "../../VoiceTextControls";
 
 interface LogicInputPanelProps {
   mode: "binary-search" | "two-sum-ii" | "custom";
@@ -160,6 +161,18 @@ export function LogicInputPanel({
               placeholder="e.g., Find maximum sum contiguous subarray of size k, or Reverse a singly linked list..."
               className="w-full rounded-xl bg-[#090C14] border border-white/10 focus:border-[#00F5D4] focus:outline-none p-3 text-xs text-[#F4F7FB] placeholder:text-[#64748B] resize-y"
             />
+            <div className="mt-1.5">
+              <VoiceTextControls
+                value={problemStatement}
+                onChange={onProblemStatementChange}
+                contextHint="DSA problem statement"
+                speakLabel="Speak Problem"
+                uploadLabel="Upload Voice"
+                compact
+                separator="space"
+                disabled={scanning}
+              />
+            </div>
           </div>
 
           <button
