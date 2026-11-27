@@ -1,7 +1,7 @@
-import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
-import { doc, getDocFromServer, getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
+import { FirebaseApp, initializeApp } from "firebase/app";
+import { Auth, getAuth, GoogleAuthProvider } from "firebase/auth";
+import { doc, Firestore, getDocFromServer, getFirestore } from "firebase/firestore";
+import { FirebaseStorage, getStorage } from "firebase/storage";
 
 interface FirebaseAppletConfig {
   projectId: string;
@@ -31,13 +31,29 @@ const firebaseConfig: FirebaseAppletConfig = {
     import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || localConfig.firestoreDatabaseId || "",
 };
 
-const app = initializeApp(firebaseConfig);
+export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
 
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
-export const auth = getAuth(app);
-export const storage = getStorage(app);
+let app: FirebaseApp | null = null;
+let dbInstance: Firestore | null = null;
+let authInstance: Auth | null = null;
+let storageInstance: FirebaseStorage | null = null;
+
+if (isFirebaseConfigured) {
+  try {
+    app = initializeApp(firebaseConfig);
+    dbInstance = firebaseConfig.firestoreDatabaseId
+      ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+      : getFirestore(app);
+    authInstance = getAuth(app);
+    storageInstance = getStorage(app);
+  } catch (err) {
+    console.error("Firebase initialization skipped:", err);
+  }
+}
+
+export const db = dbInstance as Firestore;
+export const auth = authInstance as Auth;
+export const storage = storageInstance as FirebaseStorage;
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
 
@@ -78,13 +94,13 @@ export function handleFirestoreError(
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
+      userId: authInstance?.currentUser?.uid,
+      email: authInstance?.currentUser?.email,
+      emailVerified: authInstance?.currentUser?.emailVerified,
+      isAnonymous: authInstance?.currentUser?.isAnonymous,
+      tenantId: authInstance?.currentUser?.tenantId,
       providerInfo:
-        auth.currentUser?.providerData?.map((provider) => ({
+        authInstance?.currentUser?.providerData?.map((provider) => ({
           providerId: provider.providerId,
           email: provider.email,
         })) || [],
@@ -97,8 +113,9 @@ export function handleFirestoreError(
 }
 
 async function testConnection() {
+  if (!isFirebaseConfigured || !dbInstance) return;
   try {
-    await getDocFromServer(doc(db, "test", "connection"));
+    await getDocFromServer(doc(dbInstance, "test", "connection"));
   } catch (error) {
     if (error instanceof Error && error.message.includes("the client is offline")) {
       console.error("Please check your Firebase configuration.");

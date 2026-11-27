@@ -5,6 +5,7 @@ import {
   auth,
   db,
   handleFirestoreError,
+  isFirebaseConfigured,
   OperationType,
 } from "../services/firebaseClient";
 import {
@@ -109,6 +110,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (!isFirebaseConfigured || !auth) {
+      setAuthReady(true);
+      setCloudStatus("guest");
+      return;
+    }
     const unsub = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setAuthReady(true);
@@ -129,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Real-time Firestore listeners once authenticated & verified
   useEffect(() => {
-    if (!authReady || !user || !user.emailVerified) return;
+    if (!isFirebaseConfigured || !db || !authReady || !user || !user.emailVerified) return;
 
     const profilePath = `user_profiles/${user.uid}`;
     const unsubProfile = onSnapshot(

@@ -25,6 +25,7 @@ import {
   db,
   googleProvider,
   handleFirestoreError,
+  isFirebaseConfigured,
   OperationType,
   storage,
 } from "./firebaseClient";
@@ -90,6 +91,9 @@ export function isBootstrappedAdminEmail(email?: string | null): boolean {
 // Authentication Actions
 // -----------------------------------------------------------------------------
 export async function signInWithGooglePopup(): Promise<User> {
+  if (!isFirebaseConfigured || !auth) {
+    throw new Error("Firebase client configuration is missing on this deployment (set VITE_FIREBASE_* environment variables).");
+  }
   const result = await signInWithPopup(auth, googleProvider);
   return result.user;
 }
@@ -99,6 +103,9 @@ export async function createEmailPasswordAccount(params: {
   password: string;
   displayName: string;
 }): Promise<User> {
+  if (!isFirebaseConfigured || !auth) {
+    throw new Error("Firebase client configuration is missing on this deployment (set VITE_FIREBASE_* environment variables).");
+  }
   const cred = await createUserWithEmailAndPassword(auth, params.email.trim(), params.password);
   const safeName = clampStr(params.displayName, 60, "MAKAUT Student", 2);
   await updateProfile(cred.user, { displayName: safeName });
@@ -111,6 +118,9 @@ export async function createEmailPasswordAccount(params: {
 }
 
 export async function signInWithEmailPasswordAccount(email: string, password: string): Promise<User> {
+  if (!isFirebaseConfigured || !auth) {
+    throw new Error("Firebase client configuration is missing on this deployment (set VITE_FIREBASE_* environment variables).");
+  }
   const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
   return cred.user;
 }
