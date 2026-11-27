@@ -1,4 +1,15 @@
-import { Database, Flame, Lock, LogIn, Play, ShieldCheck, Trophy, UserCheck, Volume2, VolumeX } from "lucide-react";
+import {
+  Database,
+  Flame,
+  Lock,
+  LogIn,
+  Play,
+  ShieldCheck,
+  Trophy,
+  UserCheck,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { AppView } from "../types/nexus";
 import { useNexus } from "../store/useNexusStore";
 import { useAuth } from "../store/useAuthStore";
@@ -18,19 +29,19 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
   const xpPct = Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100));
 
   return (
-    <header className="sticky top-0 z-40 h-16 w-full border-b border-white/[0.08] bg-[#06080E]/92 px-3 sm:px-4 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
+    <header className="sticky top-0 z-40 h-16 w-full border-b border-white/[0.08] bg-[#06080E]/92 px-2 sm:px-4 xl:px-6 flex items-center justify-between gap-1.5 sm:gap-3">
       {/* Zone 1: Unique Geometric 3D Brand Logo */}
       <button
         onClick={() => onNavigate({ screen: "hub" })}
-        className="flex items-center gap-2 sm:gap-3 text-left whitespace-nowrap shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded cursor-pointer"
+        className="flex items-center gap-1.5 sm:gap-2.5 text-left whitespace-nowrap shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded cursor-pointer"
       >
         <span
           aria-hidden="true"
-          className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br from-[#00F5D4]/18 via-[#0B1220] to-[#8B5CF6]/25 border border-[#00F5D4]/45 shadow-[0_0_16px_rgba(0,245,212,0.18)] group-hover:shadow-[0_0_22px_rgba(0,245,212,0.38)] group-hover:border-[#00F5D4]/80 flex items-center justify-center transition-all shrink-0"
+          className="h-7 w-7 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br from-[#00F5D4]/18 via-[#0B1220] to-[#8B5CF6]/25 border border-[#00F5D4]/45 shadow-[0_0_16px_rgba(0,245,212,0.18)] group-hover:shadow-[0_0_22px_rgba(0,245,212,0.38)] group-hover:border-[#00F5D4]/80 flex items-center justify-center transition-all shrink-0"
         >
           <svg
             viewBox="0 0 36 36"
-            className="w-6 h-6"
+            className="w-5 h-5 sm:w-6 sm:h-6"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
           >
@@ -40,14 +51,12 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
                 <stop offset="100%" stopColor="#8B5CF6" />
               </linearGradient>
             </defs>
-            {/* Outer Isometric 3D Hex Cube */}
             <polygon
               points="18,3 31,10.5 31,25.5 18,33 5,25.5 5,10.5"
               stroke="url(#nexusHexGrad)"
               strokeWidth="1.8"
               strokeLinejoin="round"
             />
-            {/* Isometric Cube Internal Axes */}
             <path
               d="M5.5 10.8L18 18L30.5 10.8M18 18V32.5"
               stroke="#8B5CF6"
@@ -55,7 +64,6 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
               strokeWidth="1.3"
               strokeLinecap="round"
             />
-            {/* Nexus "N" Circuit Spine + Orbital Vertices */}
             <path
               d="M11.5 23.5V13L24.5 23V12.5"
               stroke="#00F5D4"
@@ -70,36 +78,36 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
           </svg>
         </span>
         <span className="flex flex-col leading-tight">
-          <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-extrabold tracking-tight text-[#F4F7FB]">
-            <span className="tracking-wider">MAKAUT</span>
+          <span className="inline-flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-sm font-extrabold tracking-tight text-[#F4F7FB]">
+            <span className="hidden min-[400px]:inline tracking-wider">MAKAUT</span>
             <span className="bg-gradient-to-r from-[#00F5D4] via-[#67E8F9] to-[#A78BFA] bg-clip-text text-transparent group-hover:brightness-110 transition-all">
               NEXUS
             </span>
-            <span className="font-mono text-[10px] font-bold px-1 py-0.5 rounded bg-[#00F5D4]/14 border border-[#00F5D4]/35 text-[#00F5D4] leading-none">
+            <span className="font-mono text-[9px] sm:text-[10px] font-bold px-1 py-0.5 rounded bg-[#00F5D4]/14 border border-[#00F5D4]/35 text-[#00F5D4] leading-none">
               3D
             </span>
-            <span className="hidden md:inline text-[#94A3B8] font-mono text-[11px] font-medium pl-0.5">
+            <span className="hidden 2xl:inline text-[#94A3B8] font-mono text-[11px] font-medium pl-0.5">
               B.TECH IT
             </span>
           </span>
-          <span className="hidden sm:block text-[11px] font-mono text-[#94A3B8]">
+          <span className="hidden sm:block text-[10px] font-mono text-[#94A3B8]">
             MAKAUT SYLLABUS · SEM 03
           </span>
         </span>
       </button>
 
-      {/* Zone 2: Academic Year Navigation (Year 1, 3, 4 strictly locked) */}
+      {/* Zone 2: Academic Year Navigation (fits comfortably from xl:1280px upward without crowding Zone 3) */}
       <nav
         aria-label="Academic Years"
-        className="hidden xl:flex items-center gap-5 text-xs font-medium"
+        className="hidden xl:flex items-center gap-3.5 2xl:gap-5 text-xs font-medium min-w-0"
       >
         <span
           aria-disabled="true"
           title="Year 1 curriculum is upcoming"
-          className="inline-flex items-center gap-1.5 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0"
+          className="hidden 2xl:inline-flex items-center gap-1.5 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0"
         >
           <Lock className="w-3.5 h-3.5" />
-          Year 1 · Upcoming
+          Year 1
         </span>
 
         <button
@@ -114,7 +122,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
           }`}
         >
           <ShieldCheck className="w-3.5 h-3.5" />
-          Year 2 Active
+          Year 2
         </button>
 
         <button
@@ -136,35 +144,44 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
               : "border-transparent text-[#94A3B8] hover:text-[#F4F7FB]"
           }`}
         >
-          Placement Season
+          Placement
         </button>
 
         <span
           aria-disabled="true"
+          title="Years 1, 3, and 4 curricula are upcoming"
+          className="inline-flex 2xl:hidden items-center gap-1 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0 text-[11px]"
+        >
+          <Lock className="w-3 h-3" />
+          Y1·Y3·Y4
+        </span>
+
+        <span
+          aria-disabled="true"
           title="Year 3 curriculum is upcoming"
-          className="inline-flex items-center gap-1.5 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0"
+          className="hidden 2xl:inline-flex items-center gap-1.5 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0"
         >
           <Lock className="w-3.5 h-3.5" />
-          Year 3 · Upcoming
+          Year 3
         </span>
 
         <span
           aria-disabled="true"
           title="Year 4 curriculum is upcoming"
-          className="inline-flex items-center gap-1.5 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0"
+          className="hidden 2xl:inline-flex items-center gap-1.5 text-[#64748B] opacity-60 cursor-not-allowed select-none whitespace-nowrap shrink-0"
         >
           <Lock className="w-3.5 h-3.5" />
-          Year 4 · Upcoming
+          Year 4
         </span>
       </nav>
 
-      {/* Zone 3: Progression Telemetry & Judge Demo CTA */}
-      <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-4 shrink-0">
-        <div className="hidden md:flex items-center gap-4 text-xs font-mono tabular-nums">
-          <div className="flex items-center gap-2">
+      {/* Zone 3: Telemetry, Controls, Cloud Vault, Sign In & Judge Demo */}
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        <div className="hidden lg:flex items-center gap-2.5 text-xs font-mono tabular-nums pr-1">
+          <div className="flex items-center gap-1.5">
             <Trophy className="w-3.5 h-3.5 text-[#00F5D4]" />
-            <span className="text-[#F4F7FB] font-semibold">LVL {level}</span>
-            <div className="w-20 h-1.5 rounded-full bg-white/10 overflow-hidden">
+            <span className="text-[#F4F7FB] font-semibold">L{level}</span>
+            <div className="hidden 2xl:block w-16 h-1.5 rounded-full bg-white/10 overflow-hidden">
               <div
                 className="h-full bg-[#00F5D4] transition-all duration-300"
                 style={{ width: `${xpPct}%` }}
@@ -177,7 +194,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
             |
           </span>
 
-          <div className="flex items-center gap-1.5 text-[#F59E0B]">
+          <div className="flex items-center gap-1 text-[#F59E0B]">
             <Flame className="w-3.5 h-3.5" />
             <span>{progress.streak}d</span>
           </div>
@@ -196,7 +213,8 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
               ? "TUTOR VOICE ON — Click to mute"
               : "TUTOR VOICE MUTED — Click to unmute"
           }
-          className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg border text-[11px] font-mono font-semibold transition-colors whitespace-nowrap shrink-0 ${
+          aria-label="Toggle Tutor Voice"
+          className={`inline-flex items-center gap-1.5 p-1.5 sm:px-2 sm:py-2 rounded-lg border text-[11px] font-mono font-semibold transition-colors whitespace-nowrap shrink-0 ${
             !voiceSupported
               ? "bg-white/[0.04] border-white/10 text-[#64748B] cursor-not-allowed"
               : voiceEnabled
@@ -209,8 +227,8 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
           ) : (
             <VolumeX className="w-3.5 h-3.5" />
           )}
-          <span className="hidden lg:inline">
-            {!voiceSupported ? "VOICE N/A" : voiceEnabled ? "TUTOR VOICE ON" : "TUTOR VOICE MUTED"}
+          <span className="hidden 2xl:inline">
+            {!voiceSupported ? "VOICE N/A" : voiceEnabled ? "VOICE ON" : "MUTED"}
           </span>
         </button>
 
@@ -218,24 +236,26 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
           type="button"
           onClick={() => setPortalModalOpen(true)}
           title="Open Cloud PYQ Vault, Cohort & Mentor/Admin RBAC Console"
-          className="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg bg-[#8B5CF6]/14 border border-[#8B5CF6]/40 text-[#DDD6FE] hover:bg-[#8B5CF6]/25 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+          aria-label="Open Cloud Vault and RBAC Console"
+          className="inline-flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-2 rounded-lg bg-[#8B5CF6]/14 border border-[#8B5CF6]/40 text-[#DDD6FE] hover:bg-[#8B5CF6]/25 text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
         >
           <Database className="w-3.5 h-3.5 text-[#A78BFA]" />
-          <span className="hidden lg:inline">Cloud Vault</span>
+          <span className="hidden md:inline">Vault</span>
         </button>
 
         <button
           type="button"
           onClick={() => setAuthModalOpen(true)}
           title={user ? `Signed in (${role.toUpperCase()})` : "Sign In / Create Account"}
-          className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg border text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+          aria-label={user ? "Account and Role Settings" : "Sign In or Create Account"}
+          className={`inline-flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-2 rounded-lg border text-[11px] font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             user
               ? "bg-[#10B981]/15 border-[#10B981]/45 text-[#6EE7B7] hover:bg-[#10B981]/25"
-              : "bg-white/[0.06] border-white/15 text-[#F4F7FB] hover:border-[#00F5D4]/55"
+              : "bg-white/[0.08] border-[#00F5D4]/40 text-[#F4F7FB] hover:border-[#00F5D4]"
           }`}
         >
           {user ? <UserCheck className="w-3.5 h-3.5" /> : <LogIn className="w-3.5 h-3.5 text-[#00F5D4]" />}
-          <span className="hidden sm:inline max-w-[110px] truncate">
+          <span className="hidden sm:inline max-w-[100px] truncate">
             {user ? `${(profile?.displayName || "Account").split(" ")[0]} · ${role.toUpperCase()}` : "Sign In"}
           </span>
         </button>
@@ -243,14 +263,16 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
         <button
           type="button"
           onClick={onToggleDemo}
-          className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+          aria-label="Toggle Judge Demo"
+          className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             demoOpen
               ? "bg-[#00F5D4] text-[#06080E]"
               : "bg-[#00F5D4]/15 text-[#00F5D4] border border-[#00F5D4]/40 hover:bg-[#00F5D4] hover:text-[#06080E]"
           }`}
         >
           <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-          Judge Demo
+          <span className="sm:hidden">Demo</span>
+          <span className="hidden sm:inline">Judge Demo</span>
         </button>
       </div>
     </header>

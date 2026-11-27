@@ -66,14 +66,14 @@ export function MusicPlayerControl() {
               ? `Playing ${activeTrack.title} — Click to pause`
               : `Play ambient focus music (${activeTrack.title})`
           }
-          className="inline-flex items-center gap-1.5 pl-2 pr-1.5 py-1.5 sm:pl-2.5 sm:pr-2 sm:py-2 text-[11px] font-mono font-semibold hover:text-[#F4F7FB] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded-l-lg"
+          className="inline-flex items-center gap-1.5 pl-1.5 pr-1 py-1.5 sm:pl-2.5 sm:pr-2 sm:py-2 text-[11px] font-mono font-semibold hover:text-[#F4F7FB] transition-colors whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded-l-lg"
         >
           {state.playing ? (
             <Pause className="w-3.5 h-3.5 text-[#C4B5FD]" />
           ) : (
             <Play className="w-3.5 h-3.5" />
           )}
-          <span className="hidden lg:inline">
+          <span className="hidden 2xl:inline">
             {state.playing ? "MUSIC ON" : "MUSIC"}
           </span>
         </button>
@@ -87,7 +87,7 @@ export function MusicPlayerControl() {
           aria-haspopup="dialog"
           aria-label="Choose music track and volume"
           title="Music tracks & volume"
-          className="inline-flex items-center px-1.5 py-1.5 sm:py-2 hover:text-[#F4F7FB] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded-r-lg"
+          className="inline-flex items-center px-1 sm:px-1.5 py-1.5 sm:py-2 hover:text-[#F4F7FB] transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded-r-lg"
         >
           <ChevronDown
             className={`w-3.5 h-3.5 transition-transform duration-150 ${
