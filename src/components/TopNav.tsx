@@ -1,6 +1,7 @@
 import { Flame, Lock, Play, ShieldCheck, Trophy, Volume2, VolumeX } from "lucide-react";
 import { AppView } from "../types/nexus";
 import { useNexus } from "../store/useNexusStore";
+import { MusicPlayerControl } from "./MusicPlayerControl";
 
 interface TopNavProps {
   view: AppView;
@@ -15,20 +16,20 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
   const xpPct = Math.min(100, Math.round((xpIntoLevel / xpForNextLevel) * 100));
 
   return (
-    <header className="sticky top-0 z-40 h-16 w-full border-b border-white/[0.08] bg-[#06080E]/92 px-4 lg:px-8 flex items-center justify-between gap-6">
+    <header className="sticky top-0 z-40 h-16 w-full border-b border-white/[0.08] bg-[#06080E]/92 px-3 sm:px-4 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 lg:gap-6">
       {/* Zone 1: Brand */}
       <button
         onClick={() => onNavigate({ screen: "hub" })}
-        className="flex items-center gap-3 text-left whitespace-nowrap shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded"
+        className="flex items-center gap-2 sm:gap-3 text-left whitespace-nowrap shrink-0 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00F5D4] rounded cursor-pointer"
       >
-        <span className="h-8 w-8 rounded-md bg-[#00F5D4]/15 border border-[#00F5D4]/40 flex items-center justify-center text-[#00F5D4] font-mono text-xs font-bold">
+        <span className="h-7 w-7 sm:h-8 sm:w-8 rounded-md bg-[#00F5D4]/15 border border-[#00F5D4]/40 flex items-center justify-center text-[#00F5D4] font-mono text-[11px] sm:text-xs font-bold">
           MN
         </span>
         <span className="flex flex-col leading-tight">
-          <span className="text-sm font-bold tracking-tight text-[#F4F7FB] group-hover:text-[#00F5D4] transition-colors">
-            MAKAUT NEXUS <span className="text-[#94A3B8] font-normal">B.TECH IT</span>
+          <span className="text-xs sm:text-sm font-bold tracking-tight text-[#F4F7FB] group-hover:text-[#00F5D4] transition-colors">
+            MAKAUT NEXUS <span className="hidden md:inline text-[#94A3B8] font-normal">B.TECH IT</span>
           </span>
-          <span className="text-[11px] font-mono text-[#94A3B8]">
+          <span className="hidden sm:block text-[11px] font-mono text-[#94A3B8]">
             MAKAUT SYLLABUS · SEM 03
           </span>
         </span>
@@ -50,7 +51,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
 
         <button
           onClick={() => onNavigate({ screen: "hub" })}
-          className={`inline-flex items-center gap-1.5 pb-1 border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+          className={`inline-flex items-center gap-1.5 pb-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             view.screen === "hub" ||
             view.screen === "exam-season" ||
             view.screen === "game" ||
@@ -65,7 +66,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
 
         <button
           onClick={() => onNavigate({ screen: "exam-season" })}
-          className={`pb-1 border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+          className={`pb-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             view.screen === "exam-season"
               ? "border-[#00F5D4] text-[#F4F7FB]"
               : "border-transparent text-[#94A3B8] hover:text-[#F4F7FB]"
@@ -76,7 +77,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
 
         <button
           onClick={() => onNavigate({ screen: "placement-season", tab: "aptitude" })}
-          className={`pb-1 border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+          className={`pb-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             view.screen === "placement-season"
               ? "border-[#8B5CF6] text-[#F4F7FB]"
               : "border-transparent text-[#94A3B8] hover:text-[#F4F7FB]"
@@ -105,7 +106,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
       </nav>
 
       {/* Zone 3: Progression Telemetry & Judge Demo CTA */}
-      <div className="flex items-center gap-4 shrink-0">
+      <div className="flex items-center gap-1.5 sm:gap-3 lg:gap-4 shrink-0">
         <div className="hidden md:flex items-center gap-4 text-xs font-mono tabular-nums">
           <div className="flex items-center gap-2">
             <Trophy className="w-3.5 h-3.5 text-[#00F5D4]" />
@@ -129,6 +130,8 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
           </div>
         </div>
 
+        <MusicPlayerControl />
+
         <button
           type="button"
           onClick={toggleVoice}
@@ -140,7 +143,7 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
               ? "TUTOR VOICE ON — Click to mute"
               : "TUTOR VOICE MUTED — Click to unmute"
           }
-          className={`inline-flex items-center gap-1.5 px-2.5 py-2 rounded-lg border text-[11px] font-mono font-semibold transition-colors whitespace-nowrap shrink-0 ${
+          className={`inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1.5 sm:py-2 rounded-lg border text-[11px] font-mono font-semibold transition-colors whitespace-nowrap shrink-0 ${
             !voiceSupported
               ? "bg-white/[0.04] border-white/10 text-[#64748B] cursor-not-allowed"
               : voiceEnabled
@@ -159,14 +162,15 @@ export function TopNav({ view, onNavigate, demoOpen, onToggleDemo }: TopNavProps
         </button>
 
         <button
+          type="button"
           onClick={onToggleDemo}
-          className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+          className={`inline-flex items-center gap-1 sm:gap-2 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-[11px] sm:text-xs font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
             demoOpen
               ? "bg-[#00F5D4] text-[#06080E]"
               : "bg-[#00F5D4]/15 text-[#00F5D4] border border-[#00F5D4]/40 hover:bg-[#00F5D4] hover:text-[#06080E]"
           }`}
         >
-          <Play className="w-3.5 h-3.5" />
+          <Play className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
           Judge Demo
         </button>
       </div>

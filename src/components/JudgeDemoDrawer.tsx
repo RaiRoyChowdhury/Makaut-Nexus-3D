@@ -79,7 +79,7 @@ export function JudgeDemoDrawer({
   if (!open) return null;
 
   return (
-    <aside className="fixed right-4 top-20 z-50 w-80 nexus-panel-solid rounded-2xl border border-[#00F5D4]/40 p-4 space-y-3 shadow-2xl">
+    <aside className="fixed right-4 top-20 z-50 w-80 max-w-[calc(100vw-2rem)] max-h-[calc(100vh-5.5rem)] overflow-y-auto nexus-panel-solid rounded-2xl border border-[#00F5D4]/40 p-4 space-y-3 shadow-2xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-[#00F5D4]" />
