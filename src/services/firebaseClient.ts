@@ -20,15 +20,31 @@ const localConfigs = import.meta.glob<{ default: Partial<FirebaseAppletConfig> }
 const localConfig = Object.values(localConfigs)[0]?.default ?? {};
 
 const firebaseConfig: FirebaseAppletConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || localConfig.apiKey || "",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || localConfig.authDomain || "",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || localConfig.projectId || "",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || localConfig.storageBucket || "",
+  apiKey: (import.meta.env.VITE_FIREBASE_API_KEY || localConfig.apiKey || "").trim(),
+  authDomain:
+    import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ||
+    localConfig.authDomain ||
+    "splendid-descent-1pjks.firebaseapp.com",
+  projectId:
+    import.meta.env.VITE_FIREBASE_PROJECT_ID ||
+    localConfig.projectId ||
+    "splendid-descent-1pjks",
+  storageBucket:
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ||
+    localConfig.storageBucket ||
+    "splendid-descent-1pjks.firebasestorage.app",
   messagingSenderId:
-    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || localConfig.messagingSenderId || "",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || localConfig.appId || "",
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
+    localConfig.messagingSenderId ||
+    "224646832506",
+  appId:
+    import.meta.env.VITE_FIREBASE_APP_ID ||
+    localConfig.appId ||
+    "1:224646832506:web:3164b5417aafe4f62cf6c3",
   firestoreDatabaseId:
-    import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID || localConfig.firestoreDatabaseId || "",
+    import.meta.env.VITE_FIREBASE_FIRESTORE_DATABASE_ID ||
+    localConfig.firestoreDatabaseId ||
+    "ai-studio-makautnexus3d-b5a84554-5c7e-41c9-88ac-ac5005cb1494",
 };
 
 export const isFirebaseConfigured = Boolean(firebaseConfig.apiKey && firebaseConfig.projectId);
