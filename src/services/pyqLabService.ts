@@ -330,7 +330,7 @@ export async function generatePyqLab(query: string): Promise<PyqLabConfig> {
   }
 
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 15000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 24000);
 
   try {
     const res = await fetch("/api/ai/pyq-lab", {
@@ -411,7 +411,7 @@ async function readImageAsBase64(file: File): Promise<{ mimeType: string; base64
 export async function extractPyqQuestionFromImage(file: File): Promise<string> {
   const { mimeType, base64Data } = await readImageAsBase64(file);
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 18000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 24000);
 
   try {
     const res = await fetch("/api/ai/pyq-lab-image", {
@@ -445,7 +445,7 @@ export async function generatePyqLabFromImage(
 ): Promise<PyqLabConfig> {
   const { mimeType, base64Data } = await readImageAsBase64(file);
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 20000);
+  const timeoutId = window.setTimeout(() => controller.abort(), 26000);
 
   try {
     const res = await fetch("/api/ai/pyq-lab-image", {

@@ -427,22 +427,41 @@ export async function scanAndMorphLogic(
     };
   }
 
-  const timer = window.setTimeout(() => controller.abort(), 21000);
+  const timer = window.setTimeout(() => controller.abort(), 27000);
 
   try {
-    const res = await fetch("/api/ai/logic-morph", {
+    const payloadBody = JSON.stringify({
+      problemStatement: req.problemStatement,
+      logicText: req.logicText,
+      selectedText: req.selectedText,
+      pseudocode: req.pseudocode,
+      exampleInput: req.exampleInput,
+      expectedOutput: req.expectedOutput,
+    });
+
+    let res = await fetch("/api/ai/logic-morph", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      body: JSON.stringify({
-        problemStatement: req.problemStatement,
-        logicText: req.logicText,
-        selectedText: req.selectedText,
-        pseudocode: req.pseudocode,
-        exampleInput: req.exampleInput,
-        expectedOutput: req.expectedOutput,
-      }),
+      body: payloadBody,
     });
+
+    // If upstream Gemini returned a transient 503 high-demand spike (with retryAfterSeconds),
+    // wait briefly and perform one quiet retry before falling back locally.
+    if (res.status === 503) {
+      const transientInfo = await res.clone().json().catch(() => ({}));
+      if (typeof transientInfo?.retryAfterSeconds === "number" && seq === latestScanSeq) {
+        await new Promise((r) => window.setTimeout(r, 1100));
+        if (!controller.signal.aborted && seq === latestScanSeq) {
+          res = await fetch("/api/ai/logic-morph", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controller.signal,
+            body: payloadBody,
+          });
+        }
+      }
+    }
 
     if (res.status === 429) {
       const errData = await res.clone().json().catch(() => ({}));
@@ -771,7 +790,7 @@ export async function reviewStudentCode(params: {
   }
 
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 14000);
+  const timer = window.setTimeout(() => controller.abort(), 24000);
 
   try {
     const res = await fetch("/api/ai/logic-code-review", {

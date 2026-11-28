@@ -62,7 +62,7 @@ export async function transcribeAudioBlob(
   });
 
   const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), 22000);
+  const timer = window.setTimeout(() => controller.abort(), 26000);
 
   try {
     const res = await fetch("/api/ai/transcribe-audio", {

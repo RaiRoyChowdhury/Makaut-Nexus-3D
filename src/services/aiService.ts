@@ -177,7 +177,7 @@ export async function requestAiIntuition(
   lastIntuitionCallAt = now;
 
   try {
-    const res = await fetchWithTimeout("/api/ai/intuition", req, 18000, controller);
+    const res = await fetchWithTimeout("/api/ai/intuition", req, 24000, controller);
     if (!res.ok) throw new Error("API unavailable");
     const data = await res.json();
     if (data?.intuition) {
@@ -357,7 +357,7 @@ const LOCAL_PROJECTS: Record<string, ProjectForgeResult> = {
 export async function generateProjectBlueprint(req: ProjectForgeRequest): Promise<ProjectForgeResult> {
   if (!isClientRateLimited()) {
     try {
-      const res = await fetchWithTimeout("/api/ai/project-forge", req, 15000);
+      const res = await fetchWithTimeout("/api/ai/project-forge", req, 24000);
       if (!res.ok) throw new Error("API unavailable");
       const data = await res.json();
       if (data?.title && Array.isArray(data?.coreFeatures)) {
@@ -624,7 +624,7 @@ export async function generateAptitudeQuestions(
 ): Promise<{ questions: AptitudeQ[]; source: "gemini" | "local" }> {
   if (!isClientRateLimited()) {
     try {
-      const res = await fetchWithTimeout("/api/ai/aptitude-generate", req, 20000);
+      const res = await fetchWithTimeout("/api/ai/aptitude-generate", req, 24000);
       if (!res.ok) throw new Error("API unavailable");
       const data = await res.json();
       if (Array.isArray(data?.questions) && data.questions.length > 0) {
@@ -773,7 +773,7 @@ export async function generateInterviewQuestion(
 ): Promise<GeneratedInterviewQuestion> {
   if (!isClientRateLimited()) {
     try {
-      const res = await fetchWithTimeout("/api/ai/interview-question", req, 17000);
+      const res = await fetchWithTimeout("/api/ai/interview-question", req, 24000);
       if (!res.ok) throw new Error("API unavailable");
       const data = await res.json();
       if (typeof data?.question === "string" && Array.isArray(data?.expectedConcepts)) {

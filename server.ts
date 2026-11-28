@@ -14,9 +14,66 @@ const PORT = Number(process.env.PORT) || 3000;
 const FAST_MODEL = "gemini-3.1-flash-lite";
 const REASONING_MODEL = "gemini-4-hydrogen";
 
+const MISSING_KEY_ERROR =
+  "GEMINI_API_KEY is not configured on the server (add it in Settings > Secrets or Render Environment).";
+
+function getCleanedGeminiKey(): string | null {
+  const raw = (process.env.GEMINI_API_KEY ?? "").trim().replace(/^["']|["']$/g, "").trim();
+  if (!raw || raw === "MY_GEMINI_API_KEY") {
+    return null;
+  }
+  return raw;
+}
+
+app.get("/api/health", async (req, res) => {
+  const ai = getGeminiClient();
+  const basePayload = {
+    ok: true,
+    geminiConfigured: Boolean(ai),
+    models: {
+      fast: FAST_MODEL,
+      reasoning: REASONING_MODEL,
+    },
+  };
+
+  if (req.query.probe !== "1") {
+    return res.json(basePayload);
+  }
+  if (!ai) {
+    return res.status(503).json({
+      ...basePayload,
+      probeOk: false,
+      probeError: MISSING_KEY_ERROR,
+    });
+  }
+
+  try {
+    const result = await generateResilient(ai, {
+      contents: "Reply with OK",
+      fastTimeoutMs: 7000,
+      fallbackTimeoutMs: 10000,
+      maxTotalMs: 16000,
+    });
+    return res.json({
+      ...basePayload,
+      probeOk: true,
+      probeModel: result.model,
+    });
+  } catch (err) {
+    const msg = extractErrMessage(err)
+      .replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]")
+      .slice(0, 260);
+    return res.status(503).json({
+      ...basePayload,
+      probeOk: false,
+      probeError: msg,
+    });
+  }
+});
+
 function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+  const apiKey = getCleanedGeminiKey();
+  if (!apiKey) {
     return null;
   }
   return new GoogleGenAI({
@@ -27,6 +84,10 @@ function getGeminiClient(): GoogleGenAI | null {
       },
     },
   });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function withTimeout<T>(promise: Promise<T>, ms = 15000): Promise<T> {
@@ -70,11 +131,51 @@ function setCached(key: string, value: unknown, ttlMs = 5 * 60 * 1000): void {
   aiCache.set(key, { value, expiresAt: Date.now() + ttlMs });
 }
 
+function extractErrMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err ?? "");
+}
+
+function isNonRetryableKeyError(err: unknown): boolean {
+  const msg = extractErrMessage(err).toLowerCase();
+  return (
+    msg.includes("api_key_invalid") ||
+    msg.includes("api key not valid") ||
+    msg.includes("permission_denied") ||
+    msg.includes("access_token_scope_insufficient") ||
+    msg.includes('"code":403') ||
+    msg.includes('"code":401')
+  );
+}
+
+function isModelNotFoundError(err: unknown): boolean {
+  const msg = extractErrMessage(err).toLowerCase();
+  return msg.includes("not_found") || msg.includes('"code":404');
+}
+
+function isTransientUnavailableError(err: unknown): boolean {
+  const msg = extractErrMessage(err).toLowerCase();
+  return (
+    msg.includes("503") ||
+    msg.includes("unavailable") ||
+    msg.includes("high demand") ||
+    msg.includes("overloaded") ||
+    msg.includes("temporarily") ||
+    msg.includes("500") ||
+    msg.includes("internal") ||
+    msg.includes("timed out") ||
+    msg.includes("econnreset") ||
+    msg.includes("etimedout") ||
+    msg.includes("fetch failed") ||
+    msg.includes("empty response") ||
+    msg.includes("invalid output")
+  );
+}
+
 function parseRateLimitError(
   err: unknown,
   modelName?: string
 ): { isRateLimit: boolean; retryAfterSeconds: number } {
-  const msg = err instanceof Error ? err.message : String(err ?? "");
+  const msg = extractErrMessage(err);
   const isRateLimit =
     msg.includes("429") ||
     msg.includes("RESOURCE_EXHAUSTED") ||
@@ -123,19 +224,43 @@ async function generateResilient(
     responseSchema?: Record<string, unknown>;
     fastTimeoutMs?: number;
     fallbackTimeoutMs?: number;
+    maxTotalMs?: number;
     validateText?: (text: string) => boolean;
   }
 ): Promise<{ text: string; model: string }> {
-  const attempts: { model: string; thinkingLevel: ThinkingLevel; timeoutMs: number }[] = [
+  const fastTimeout = options.fastTimeoutMs ?? 9000;
+  const fallbackTimeout = options.fallbackTimeoutMs ?? 12000;
+  const deadline = Date.now() + (options.maxTotalMs ?? 21000);
+
+  const attempts: {
+    model: string;
+    thinkingLevel: ThinkingLevel;
+    timeoutMs: number;
+    delayBeforeMs: number;
+  }[] = [
     {
       model: FAST_MODEL,
       thinkingLevel: ThinkingLevel.MINIMAL,
-      timeoutMs: options.fastTimeoutMs ?? 9000,
+      timeoutMs: fastTimeout,
+      delayBeforeMs: 0,
     },
     {
       model: REASONING_MODEL,
       thinkingLevel: ThinkingLevel.LOW,
-      timeoutMs: options.fallbackTimeoutMs ?? 14000,
+      timeoutMs: fallbackTimeout,
+      delayBeforeMs: 0,
+    },
+    {
+      model: REASONING_MODEL,
+      thinkingLevel: ThinkingLevel.LOW,
+      timeoutMs: Math.min(fallbackTimeout, 9500),
+      delayBeforeMs: 550 + Math.floor(Math.random() * 250),
+    },
+    {
+      model: FAST_MODEL,
+      thinkingLevel: ThinkingLevel.MINIMAL,
+      timeoutMs: Math.min(fastTimeout, 8000),
+      delayBeforeMs: 750 + Math.floor(Math.random() * 350),
     },
   ];
 
@@ -145,6 +270,18 @@ async function generateResilient(
     if (getModelCooldownRemaining(attempt.model) > 0) {
       continue;
     }
+    const remainingBudget = deadline - Date.now();
+    if (remainingBudget < 2500) {
+      break;
+    }
+    if (attempt.delayBeforeMs > 0) {
+      if (remainingBudget - attempt.delayBeforeMs < 2500) {
+        break;
+      }
+      await sleep(attempt.delayBeforeMs);
+    }
+
+    const effectiveTimeout = Math.min(attempt.timeoutMs, Math.max(2500, deadline - Date.now()));
     try {
       const config: Record<string, unknown> = {
         thinkingConfig: { thinkingLevel: attempt.thinkingLevel },
@@ -162,7 +299,7 @@ async function generateResilient(
           contents: options.contents as never,
           config: config as never,
         }),
-        attempt.timeoutMs
+        effectiveTimeout
       );
 
       const text = (response.text ?? "").trim();
@@ -174,8 +311,14 @@ async function generateResilient(
       }
       return { text, model: attempt.model };
     } catch (err) {
-      parseRateLimitError(err, attempt.model);
       lastErr = err;
+      if (isNonRetryableKeyError(err)) {
+        throw err;
+      }
+      const rl = parseRateLimitError(err, attempt.model);
+      if (rl.isRateLimit || isModelNotFoundError(err) || isTransientUnavailableError(err)) {
+        continue;
+      }
     }
   }
 
@@ -196,11 +339,39 @@ function sendAiError(
       code: 429,
     });
   }
-  const msg = err instanceof Error ? err.message : String(err ?? "");
-  if (msg.toLowerCase().includes("timed out")) {
-    return res.status(504).json({ error: "AI request timed out", code: 504 });
-  }
+  const msg = extractErrMessage(err);
   const safeDetail = msg.replace(/AIza[0-9A-Za-z_-]{20,}/g, "[REDACTED]").slice(0, 220);
+
+  if (isNonRetryableKeyError(err)) {
+    return res.status(503).json({
+      error: "Gemini API key is invalid or lacks permission. Check GEMINI_API_KEY in Settings > Secrets or Render Environment.",
+      detail: safeDetail,
+      code: 503,
+    });
+  }
+  if (isModelNotFoundError(err)) {
+    return res.status(502).json({
+      error: "Configured Gemini model is unavailable for this API key.",
+      detail: safeDetail,
+      code: 502,
+    });
+  }
+  if (
+    msg.includes("503") ||
+    msg.toUpperCase().includes("UNAVAILABLE") ||
+    msg.toLowerCase().includes("high demand") ||
+    msg.toLowerCase().includes("overloaded")
+  ) {
+    return res.status(503).json({
+      error: "Gemini is temporarily busy (high demand). Please retry in a few seconds.",
+      retryAfterSeconds: 4,
+      detail: safeDetail,
+      code: 503,
+    });
+  }
+  if (msg.toLowerCase().includes("timed out")) {
+    return res.status(504).json({ error: "AI request timed out", detail: safeDetail, code: 504 });
+  }
   return res
     .status(fallbackStatus)
     .json({ error: fallbackMsg, detail: safeDetail, code: fallbackStatus });
@@ -224,7 +395,7 @@ app.post("/api/ai/hint", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "Gemini API key not configured" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
   try {
     const prompt = `You are an expert MAKAUT B.Tech IT professor tutoring a student inside a 3D engineering simulation.
@@ -267,7 +438,7 @@ app.post("/api/ai/intuition", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "Gemini API key not configured" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
   try {
     const prompt = `You are the AI Intuition engine in MAKAUT NEXUS 3D.
@@ -304,7 +475,7 @@ app.post("/api/ai/interview-eval", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "Gemini API key not configured" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
   try {
     const prompt = `Evaluate this B.Tech IT placement interview answer for MAKAUT NEXUS 3D.
@@ -370,7 +541,7 @@ app.post("/api/ai/project-forge", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "Gemini API key not configured" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
   try {
     const prompt = `Generate a standout, portfolio-grade B.Tech IT capstone or placement project blueprint for a MAKAUT engineering student.
@@ -439,7 +610,7 @@ app.post("/api/ai/pyq-lab", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "Gemini API key not configured" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   try {
@@ -536,7 +707,7 @@ app.post("/api/ai/pyq-lab-image", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   try {
@@ -672,7 +843,7 @@ app.post("/api/ai/aptitude-generate", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   const safeCount = Math.min(9, Math.max(3, Number(count) || 6));
@@ -804,7 +975,7 @@ app.post("/api/ai/interview-question", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   const prevList = Array.isArray(previousQuestions)
@@ -894,7 +1065,7 @@ app.post("/api/ai/logic-morph", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   try {
@@ -1201,7 +1372,7 @@ app.post("/api/ai/logic-ocr", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   try {
@@ -1291,7 +1462,7 @@ app.post("/api/ai/transcribe-audio", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   // Normalize non-standard browser MIME aliases
@@ -1315,27 +1486,36 @@ app.post("/api/ai/transcribe-audio", async (req, res) => {
     ? `Transcribe this spoken engineering/student audio (${String(fileName).slice(0, 60)}) accurately into clean plain text without extra commentary. Context: ${String(contextHint).slice(0, 120)}.`
     : `Transcribe this spoken audio (${String(fileName).slice(0, 60)}) accurately into clean plain text without extra commentary.`;
 
-  const transcribeModels = ["gemini-3.5-transcribe", FAST_MODEL];
+  const transcribeModels = [
+    { model: "gemini-3.5-transcribe", delayMs: 0 },
+    { model: FAST_MODEL, delayMs: 0 },
+    { model: REASONING_MODEL, delayMs: 550 },
+    { model: "gemini-3.5-transcribe", delayMs: 750 },
+  ];
   let lastErr: unknown = new Error("Audio transcription failed");
 
-  for (const modelName of transcribeModels) {
-    if (getModelCooldownRemaining(modelName) > 0) continue;
+  for (const attempt of transcribeModels) {
+    if (getModelCooldownRemaining(attempt.model) > 0) continue;
+    if (attempt.delayMs > 0) {
+      await sleep(attempt.delayMs);
+    }
     try {
       const response = await withTimeout(
         ai.models.generateContent({
-          model: modelName,
+          model: attempt.model,
           contents: { parts: [audioPart, { text: promptText }] },
         }),
-        18000
+        14000
       );
       const transcript = (response.text ?? "").trim();
       if (!transcript) {
-        throw new Error(`Empty transcript from ${modelName}`);
+        throw new Error(`Empty transcript from ${attempt.model}`);
       }
-      return res.json({ transcript, source: "gemini", model: modelName });
+      return res.json({ transcript, source: "gemini", model: attempt.model });
     } catch (err) {
-      parseRateLimitError(err, modelName);
       lastErr = err;
+      if (isNonRetryableKeyError(err)) break;
+      parseRateLimitError(err, attempt.model);
     }
   }
 
@@ -1386,7 +1566,7 @@ app.post("/api/ai/logic-code-review", async (req, res) => {
 
   const ai = getGeminiClient();
   if (!ai) {
-    return res.status(503).json({ error: "GEMINI_API_KEY not configured on server" });
+    return res.status(503).json({ error: MISSING_KEY_ERROR, code: 503 });
   }
 
   try {
